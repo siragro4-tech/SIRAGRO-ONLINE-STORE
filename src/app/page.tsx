@@ -69,7 +69,7 @@ export default async function HomePage() {
                 id="hero-heading"
                 className="mt-4 text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl xl:text-6xl"
               >
-                Hayes&rsquo; Favourite
+                SIRAGRO
                 <span className="block" style={{ color: "#4ade80" }}>
                   Supermarket
                 </span>
