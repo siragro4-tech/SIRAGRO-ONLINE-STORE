@@ -32,9 +32,9 @@ export default async function HomePage() {
       <section
         className="relative overflow-hidden min-h-[480px] sm:min-h-[540px] flex items-center bg-[#1e2530] border-b-4 border-[#242c37]"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.50) 0%, rgba(30, 41, 59, 0.22) 55%, rgba(15, 23, 42, 0.05) 100%), url('/images/hero-supermarket.jpg')`,
+          backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.52) 0%, rgba(30, 41, 59, 0.22) 55%, rgba(15, 23, 42, 0.06) 100%), url('/images/hero-supermarket.jpg')`,
           backgroundSize: "cover",
-          backgroundPosition: "center 30%",
+          backgroundPosition: "center 40%",
         }}
         aria-labelledby="hero-heading"
       >
