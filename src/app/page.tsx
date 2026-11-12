@@ -32,7 +32,7 @@ export default async function HomePage() {
       <section
         className="relative overflow-hidden min-h-[480px] sm:min-h-[540px] flex items-center bg-[#1e2530] border-b-4 border-[#242c37]"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(15, 23, 42, 0.52) 0%, rgba(30, 41, 59, 0.22) 55%, rgba(15, 23, 42, 0.06) 100%), url('/images/hero-supermarket.jpg')`,
+          backgroundImage: `linear-gradient(to right, rgba(36, 44, 55, 0.78) 0%, rgba(50, 60, 75, 0.60) 50%, rgba(50, 60, 75, 0.38) 100%), url('/images/hero-supermarket.jpg')`,
           backgroundSize: "cover",
           backgroundPosition: "center 40%",
         }}
