@@ -58,31 +58,61 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full shadow-md" style={{ backgroundColor: "#323C4B" }}>
 
-      {/* ── Layer 1: Top Utility Bar (Clean store details, NO sign in / register text) ── */}
-      <div className="bg-[#242c37] text-white/90 text-xs border-b border-[#3d495b]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4 sm:gap-6 font-medium">
-            <span className="flex items-center gap-1.5">
+      {/* ── Layer 1: Top Utility Bar (Slow Horizontally Moving Marquee Ticker) ── */}
+      <div className="bg-[#242c37] text-white/90 text-xs border-b border-[#3d495b] overflow-hidden flex items-center py-2">
+        <div className="marquee-container flex-1">
+          <div className="marquee-content flex items-center gap-12 font-medium">
+            {/* Set 1 */}
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
               <span>📍</span>
-              147 North Hyde Road, Hayes UB3 4NS
+              <strong>147 North Hyde Road, Hayes UB3 4NS</strong>
             </span>
-            <span className="hidden sm:flex items-center gap-1.5 font-bold text-white">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white font-bold">
               <span>📞</span>
-              020 8813 6458 / 0208 848 4840
+              <strong>020 8813 6458 / 0208 848 4840</strong>
             </span>
-            <span className="hidden md:flex items-center gap-1.5 text-white/80">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white/80">
               <span>🕐</span>
               Daily: 7am – 10pm
             </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/delivery-info"
-              className="rounded bg-white text-[#323C4B] font-bold px-2.5 py-0.5 hover:bg-white/90 transition-colors flex items-center gap-1 shadow-sm"
-            >
-              🚚 Delivery (5 Miles)
+            <Link href="/delivery-info" className="flex items-center gap-1.5 whitespace-nowrap text-white font-bold hover:underline">
+              <span>🚚</span>
+              Delivery up to 5 Miles (Free over £25 within 1 mile)
             </Link>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white/80">
+              <span>🏪</span>
+              Click &amp; Collect in 30 Mins
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white/80">
+              <span>🪪</span>
+              Licensed Retailer · Challenge 25
+            </span>
+
+            {/* Set 2 (for continuous seamless loop) */}
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              <span>📍</span>
+              <strong>147 North Hyde Road, Hayes UB3 4NS</strong>
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white font-bold">
+              <span>📞</span>
+              <strong>020 8813 6458 / 0208 848 4840</strong>
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white/80">
+              <span>🕐</span>
+              Daily: 7am – 10pm
+            </span>
+            <Link href="/delivery-info" className="flex items-center gap-1.5 whitespace-nowrap text-white font-bold hover:underline">
+              <span>🚚</span>
+              Delivery up to 5 Miles (Free over £25 within 1 mile)
+            </Link>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white/80">
+              <span>🏪</span>
+              Click &amp; Collect in 30 Mins
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-white/80">
+              <span>🪪</span>
+              Licensed Retailer · Challenge 25
+            </span>
           </div>
         </div>
       </div>
