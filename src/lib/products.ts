@@ -633,3 +633,32 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   };
 }
 
+/**
+ * Fetches a single product by its primary UUID.
+ */
+export async function getProductById(id: string): Promise<Product | null> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from("products")
+      .select("*, category:categories(*), images:product_images(*)")
+      .eq("id", id)
+      .single();
+
+    if (!error && data) {
+      return data as unknown as Product;
+    }
+  } catch {
+    // Fallback
+  }
+
+  const product = FALLBACK_PRODUCTS.find((p) => p.id === id);
+  if (!product) return null;
+
+  return {
+    ...product,
+    category: FALLBACK_CATEGORIES.find((c) => c.id === product.category_id) || null,
+  };
+}
+
+
