@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ContactForm } from "@/components/contact/ContactForm";
 
 export const metadata: Metadata = {
   title: "Contact Us | SIRAGRO Supermarket & Off-Licence",
@@ -38,67 +39,7 @@ export default function ContactPage() {
                 Fill in the details below and our team will get back to you promptly.
               </p>
 
-              <form className="mt-6 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase">Your Name</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. John Doe"
-                      className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-[#323C4B] focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase">Phone Number</label>
-                    <input
-                      type="tel"
-                      placeholder="e.g. 07123 456789"
-                      className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-[#323C4B] focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="name@example.com"
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-[#323C4B] focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase">Subject</label>
-                  <select
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-[#323C4B] focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
-                  >
-                    <option>General Enquiry</option>
-                    <option>Order &amp; Delivery Question</option>
-                    <option>Product Stock Availability</option>
-                    <option>In-Store Counter Services</option>
-                    <option>Other Feedback</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase">Your Message</label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="How can we help you today?"
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-[#323C4B] focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
-                  ></textarea>
-                </div>
-
-                <button
-                  type="submit"
-                  className="rounded-xl bg-[#323C4B] hover:bg-[#242c37] text-white px-8 py-3.5 text-sm font-bold shadow-md transition-all hover:scale-105 active:scale-95"
-                >
-                  Send Message
-                </button>
-              </form>
+              <ContactForm />
             </div>
           </div>
 

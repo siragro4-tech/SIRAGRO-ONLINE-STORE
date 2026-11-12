@@ -39,7 +39,7 @@ export function LoginForm() {
             type="email"
             autoComplete="email"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 sm:text-sm"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B] sm:text-sm"
             placeholder="you@example.com"
           />
         </div>
@@ -55,7 +55,7 @@ export function LoginForm() {
           </label>
           <Link
             href="/forgot-password"
-            className="text-xs font-semibold text-green-700 hover:underline"
+            className="text-xs font-bold text-[#323C4B] hover:underline"
           >
             Forgot password?
           </Link>
@@ -67,7 +67,7 @@ export function LoginForm() {
             type="password"
             autoComplete="current-password"
             required
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 sm:text-sm"
+            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B] sm:text-sm"
           />
         </div>
       </div>
@@ -75,8 +75,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="flex w-full justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-50"
-        style={{ backgroundColor: "var(--color-primary)" }}
+        className="flex w-full justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-4 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
       >
         {isPending ? "Signing in..." : "Sign In"}
       </button>
@@ -85,7 +84,7 @@ export function LoginForm() {
         Don&apos;t have an account yet?{" "}
         <Link
           href="/register"
-          className="font-semibold text-green-700 hover:underline"
+          className="font-bold text-[#323C4B] hover:underline"
         >
           Create an account
         </Link>

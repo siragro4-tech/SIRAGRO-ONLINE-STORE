@@ -12,7 +12,7 @@ export function AddAddressForm() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 p-4 text-xs font-semibold text-gray-700 hover:border-green-600 hover:text-green-700 transition-colors w-full justify-center"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 p-4 text-xs font-semibold text-gray-700 hover:border-[#323C4B] hover:text-[#323C4B] transition-colors w-full justify-center"
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -51,7 +51,7 @@ export function AddAddressForm() {
             name="label"
             type="text"
             defaultValue="Home"
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
           />
         </div>
 
@@ -65,7 +65,7 @@ export function AddAddressForm() {
             type="text"
             required
             placeholder="e.g. 10 High Street"
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
           />
         </div>
 
@@ -78,7 +78,7 @@ export function AddAddressForm() {
             name="line2"
             type="text"
             placeholder="e.g. Flat 3A"
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
           />
         </div>
 
@@ -93,7 +93,7 @@ export function AddAddressForm() {
               type="text"
               required
               defaultValue="Hayes"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             />
           </div>
 
@@ -107,7 +107,7 @@ export function AddAddressForm() {
               type="text"
               required
               placeholder="e.g. UB3 4NS"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs uppercase text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-1.5 text-xs uppercase text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             />
           </div>
         </div>
@@ -118,7 +118,7 @@ export function AddAddressForm() {
             name="isDefault"
             type="checkbox"
             value="true"
-            className="h-3.5 w-3.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+            className="h-3.5 w-3.5 rounded border-gray-300 text-[#323C4B] focus:ring-[#323C4B]"
           />
           <label htmlFor="isDefault" className="text-xs text-gray-700">
             Set as my default delivery address
@@ -129,8 +129,7 @@ export function AddAddressForm() {
           <button
             type="submit"
             disabled={isPending}
-            className="inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: "var(--color-primary)" }}
+            className="inline-flex items-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
           >
             {isPending ? "Saving..." : "Save Address"}
           </button>

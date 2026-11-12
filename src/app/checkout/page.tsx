@@ -42,11 +42,11 @@ export default async function CheckoutPage() {
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500 mb-6">
-        <Link href="/" className="hover:text-green-700 transition-colors">
+        <Link href="/" className="hover:text-[#323C4B] transition-colors">
           Home
         </Link>
         <span>/</span>
-        <Link href="/basket" className="hover:text-green-700 transition-colors">
+        <Link href="/basket" className="hover:text-[#323C4B] transition-colors">
           Basket
         </Link>
         <span>/</span>

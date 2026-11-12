@@ -99,8 +99,7 @@ export function BasketSummaryCard({ summary }: BasketSummaryCardProps) {
       <div className="mt-6 space-y-3">
         <Link
           href="/checkout"
-          className="flex w-full items-center justify-center rounded-xl px-6 py-3.5 text-base font-bold text-white shadow-sm transition-opacity hover:opacity-95"
-          style={{ backgroundColor: "var(--color-primary)" }}
+          className="flex w-full items-center justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-3.5 text-base font-bold text-white shadow-md transition-all hover:scale-[1.01] active:scale-[0.99]"
         >
           Proceed to Checkout &rarr;
         </Link>

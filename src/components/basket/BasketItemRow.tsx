@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import Link from "next/link";
 import type { BasketItem } from "@/lib/basket";
 import { updateBasketItemQuantityAction, removeBasketItemAction } from "@/app/basket/actions";
+import { CategoryMockup } from "@/components/products/ProductCard";
 
 interface BasketItemRowProps {
   item: BasketItem;
@@ -30,25 +31,27 @@ export function BasketItemRow({ item }: BasketItemRowProps) {
     <li className={`flex flex-col sm:flex-row sm:items-center sm:justify-between py-5 border-b border-gray-200 gap-4 transition-opacity ${isPending ? "opacity-50 pointer-events-none" : ""}`}>
       {/* Product Image & Title */}
       <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-50 border border-gray-100 text-green-700">
-          <svg className="h-8 w-8 text-green-700/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-          </svg>
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+          <CategoryMockup
+            slug={product.category?.slug}
+            brand={product.brand ?? undefined}
+            className="w-full h-full"
+          />
         </div>
 
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-900 hover:text-green-700">
+            <h3 className="text-sm font-bold text-gray-900 hover:text-[#323C4B] transition-colors">
               <Link href={`/product/${product.slug}`}>{product.name}</Link>
             </h3>
             {product.is_age_restricted && (
-              <span className="inline-flex items-center rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="inline-flex items-center rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs">
                 {product.minimum_age || 18}+
               </span>
             )}
           </div>
 
-          <p className="mt-0.5 text-xs text-gray-500">
+          <p className="mt-0.5 text-xs text-gray-500 font-medium">
             {product.unit || "Each"} • £{product.price.toFixed(2)} each
           </p>
         </div>

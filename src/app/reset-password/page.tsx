@@ -27,8 +27,7 @@ export default function ResetPasswordPage() {
               <div className="mt-4">
                 <Link
                   href="/login"
-                  className="inline-flex items-center rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: "var(--color-primary)" }}
+                  className="inline-flex items-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95"
                 >
                   Sign in
                 </Link>
@@ -60,7 +59,7 @@ export default function ResetPasswordPage() {
                     autoComplete="new-password"
                     required
                     minLength={8}
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 sm:text-sm"
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B] sm:text-sm"
                   />
                 </div>
               </div>
@@ -80,7 +79,7 @@ export default function ResetPasswordPage() {
                     autoComplete="new-password"
                     required
                     minLength={8}
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 sm:text-sm"
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B] sm:text-sm"
                   />
                 </div>
               </div>
@@ -88,8 +87,7 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={isPending}
-                className="flex w-full justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-95 disabled:opacity-50"
-                style={{ backgroundColor: "var(--color-primary)" }}
+                className="flex w-full justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-4 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
               >
                 {isPending ? "Updating password..." : "Update Password"}
               </button>

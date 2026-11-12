@@ -63,9 +63,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
       <nav className="mt-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" aria-label="Category filter">
         <Link
           href={`/shop${query ? `?q=${encodeURIComponent(query)}` : ""}`}
-          className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
+          className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all ${
             !selectedCategory
-              ? "bg-green-700 text-white"
+              ? "bg-[#323C4B] text-white shadow-sm scale-105"
               : "bg-gray-100 text-gray-700 hover:bg-gray-200"
           }`}
         >
@@ -81,9 +81,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             <Link
               key={cat.id}
               href={`/shop?${params.toString()}`}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
+              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all ${
                 isActive
-                  ? "bg-green-700 text-white"
+                  ? "bg-[#323C4B] text-white shadow-sm scale-105"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
@@ -117,8 +117,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
           <div className="mt-6">
             <Link
               href="/shop"
-              className="inline-flex items-center rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--color-primary)" }}
+              className="inline-flex items-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95"
             >
               Clear filters &amp; view all
             </Link>

@@ -56,8 +56,7 @@ export function AddToBasketSection({ product }: AddToBasketSectionProps) {
           type="button"
           disabled={isOutOfStock || isPending}
           onClick={handleAdd}
-          className="flex-1 flex items-center justify-center gap-2 rounded-lg px-8 py-3 text-base font-semibold text-white shadow-sm transition-all hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ backgroundColor: "var(--color-primary)" }}
+          className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-8 py-3.5 text-base font-bold text-white shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? (
             "Adding to basket..."

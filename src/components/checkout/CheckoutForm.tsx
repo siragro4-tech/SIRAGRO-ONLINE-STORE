@@ -92,7 +92,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
                   : ""
               }
               placeholder="e.g. John Smith"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             />
           </div>
 
@@ -107,7 +107,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
               required
               defaultValue={initialProfile?.email || ""}
               placeholder="you@example.com"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             />
           </div>
 
@@ -122,7 +122,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
               required
               defaultValue={initialProfile?.phone || ""}
               placeholder="e.g. 07123 456789"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             />
           </div>
         </div>
@@ -136,9 +136,9 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Home Delivery Card */}
           <label
-            className={`flex cursor-pointer flex-col rounded-xl border p-4 transition-all ${
+            className={`flex cursor-pointer flex-col rounded-xl border-2 p-4 transition-all ${
               fulfilmentType === "delivery"
-                ? "border-green-600 bg-green-50/50 ring-2 ring-green-600"
+                ? "border-[#323C4B] bg-[#323C4B]/5 ring-2 ring-[#323C4B]"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
@@ -149,7 +149,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
                 name="fulfilmentTypeRadio"
                 checked={fulfilmentType === "delivery"}
                 onChange={() => setFulfilmentType("delivery")}
-                className="h-4 w-4 text-green-600 focus:ring-green-600"
+                className="h-4 w-4 text-[#323C4B] focus:ring-[#323C4B]"
               />
             </div>
             <p className="mt-2 text-xs text-gray-500">
@@ -159,9 +159,9 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
 
           {/* In-Store Collection Card */}
           <label
-            className={`flex cursor-pointer flex-col rounded-xl border p-4 transition-all ${
+            className={`flex cursor-pointer flex-col rounded-xl border-2 p-4 transition-all ${
               fulfilmentType === "collection"
-                ? "border-green-600 bg-green-50/50 ring-2 ring-green-600"
+                ? "border-[#323C4B] bg-[#323C4B]/5 ring-2 ring-[#323C4B]"
                 : "border-gray-200 hover:border-gray-300"
             }`}
           >
@@ -172,7 +172,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
                 name="fulfilmentTypeRadio"
                 checked={fulfilmentType === "collection"}
                 onChange={() => setFulfilmentType("collection")}
-                className="h-4 w-4 text-green-600 focus:ring-green-600"
+                className="h-4 w-4 text-[#323C4B] focus:ring-[#323C4B]"
               />
             </div>
             <p className="mt-2 text-xs text-gray-500">
@@ -200,7 +200,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
                 type="text"
                 required
                 placeholder="e.g. 14 High Street"
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
               />
             </div>
 
@@ -213,7 +213,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
                 name="addressLine2"
                 type="text"
                 placeholder="e.g. Flat 2B"
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
               />
             </div>
 
@@ -228,7 +228,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
                   type="text"
                   required
                   defaultValue="Hayes"
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
                 />
               </div>
 
@@ -362,8 +362,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-4 text-base font-bold text-white shadow-md transition-opacity hover:opacity-95 disabled:opacity-50"
-          style={{ backgroundColor: "var(--color-primary)" }}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
         >
           {isSubmitting ? (
             "Connecting to Stripe..."

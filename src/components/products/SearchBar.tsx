@@ -39,7 +39,7 @@ export function SearchBar({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-full border border-gray-300 bg-gray-50 py-2.5 pl-11 pr-10 text-sm text-gray-900 shadow-inner placeholder:text-gray-400 focus:border-green-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-green-600/20 sm:text-sm"
+          className="w-full rounded-full border border-gray-300 bg-gray-50 py-2.5 pl-11 pr-10 text-sm text-gray-900 shadow-inner placeholder:text-gray-400 focus:border-[#323C4B] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#323C4B]/20 sm:text-sm"
         />
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
           <svg

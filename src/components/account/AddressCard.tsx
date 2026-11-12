@@ -34,13 +34,13 @@ export function AddressCard({ address }: AddressCardProps) {
   }
 
   return (
-    <div className={`rounded-xl border p-4 shadow-sm transition-all ${address.is_default ? "border-green-600 bg-green-50/20" : "border-gray-200 bg-white"}`}>
+    <div className={`rounded-xl border p-4 shadow-sm transition-all ${address.is_default ? "border-[#323C4B] bg-[#323C4B]/5 ring-1 ring-[#323C4B]" : "border-gray-200 bg-white"}`}>
       <div className="flex items-center justify-between">
         <span className="font-bold text-sm text-gray-900">
           {address.label || "Address"}
         </span>
         {address.is_default && (
-          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-800">
+          <span className="inline-flex items-center rounded-full bg-[#323C4B] px-2 py-0.5 text-[10px] font-black text-white shadow-xs">
             Default
           </span>
         )}

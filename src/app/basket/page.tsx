@@ -16,11 +16,11 @@ export default async function BasketPage() {
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Breadcrumb / Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500 mb-6">
-        <Link href="/" className="hover:text-green-700 transition-colors">
+        <Link href="/" className="hover:text-[#323C4B] transition-colors">
           Home
         </Link>
         <span>/</span>
-        <Link href="/shop" className="hover:text-green-700 transition-colors">
+        <Link href="/shop" className="hover:text-[#323C4B] transition-colors">
           Shop
         </Link>
         <span>/</span>
@@ -40,8 +40,8 @@ export default async function BasketPage() {
 
       {summary.items.length === 0 ? (
         /* Empty Basket State */
-        <div className="mt-12 rounded-2xl border border-dashed border-gray-300 p-12 text-center max-w-xl mx-auto">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-50 text-green-700">
+        <div className="mt-12 rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center max-w-xl mx-auto bg-slate-50/50">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#323C4B] text-white shadow-md">
             <svg
               className="h-8 w-8"
               fill="none"
@@ -57,25 +57,24 @@ export default async function BasketPage() {
             </svg>
           </div>
 
-          <h2 className="mt-4 text-lg font-bold text-gray-900">
+          <h2 className="mt-4 text-xl font-bold text-gray-900">
             Your basket is currently empty
           </h2>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-gray-500 leading-relaxed max-w-sm mx-auto">
             Explore our fresh produce, dairy, bakery, drinks, and grocery essentials
-            available for delivery near UB3 or collection.
+            available for delivery near UB3 or free in-store collection.
           </p>
 
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/shop"
-              className="inline-flex items-center rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "var(--color-primary)" }}
+              className="inline-flex items-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95"
             >
               Start Shopping
             </Link>
             <Link
               href="/category/fresh-produce"
-              className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center rounded-xl border-2 border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
             >
               Browse Fresh Produce
             </Link>
@@ -95,7 +94,7 @@ export default async function BasketPage() {
             <div className="mt-6">
               <Link
                 href="/shop"
-                className="inline-flex items-center text-sm font-semibold text-green-700 hover:text-green-800"
+                className="inline-flex items-center text-sm font-bold text-[#323C4B] hover:text-[#242c37] transition-colors"
               >
                 &larr; Continue shopping
               </Link>

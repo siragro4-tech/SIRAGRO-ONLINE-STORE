@@ -41,21 +41,16 @@ export default function ForbiddenPage() {
         This access attempt has been logged.
       </p>
 
-      <div className="mt-8 flex gap-4">
+      <div className="mt-8 flex flex-col sm:flex-row gap-3">
         <Link
           href="/"
-          className="inline-flex items-center rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
-          style={{ backgroundColor: "var(--color-primary)" }}
+          className="inline-flex items-center justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95"
         >
           Return to Store
         </Link>
         <Link
           href="/account"
-          className="inline-flex items-center rounded-lg border-2 px-6 py-2.5 text-sm font-semibold transition-colors hover:bg-gray-50"
-          style={{
-            borderColor: "var(--color-border)",
-            color: "var(--color-text)",
-          }}
+          className="inline-flex items-center justify-center rounded-xl border-2 border-slate-300 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
         >
           My Account
         </Link>

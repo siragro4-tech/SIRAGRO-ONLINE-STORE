@@ -50,11 +50,11 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Accessible Breadcrumbs */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500">
-        <Link href="/" className="hover:text-green-700 transition-colors">
+        <Link href="/" className="hover:text-[#323C4B] transition-colors">
           Home
         </Link>
         <span>/</span>
-        <Link href="/shop" className="hover:text-green-700 transition-colors">
+        <Link href="/shop" className="hover:text-[#323C4B] transition-colors">
           Shop
         </Link>
         <span>/</span>
@@ -66,7 +66,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       {/* Category Header */}
       <div className="mt-4 border-b border-gray-200 pb-6">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-green-100 text-green-700">
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#323C4B] text-white shadow-md">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -83,10 +83,10 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
             </svg>
           </span>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+            <h1 className="text-2xl font-black tracking-tight text-[#323C4B] sm:text-3xl">
               {category.name}
             </h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-600">
               {category.description || `Browse our full selection of ${category.name.toLowerCase()}.`}
             </p>
           </div>

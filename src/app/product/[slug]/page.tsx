@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getProductBySlug, getProducts } from "@/lib/products";
-import { ProductCard } from "@/components/products/ProductCard";
+import { ProductCard, CategoryMockup } from "@/components/products/ProductCard";
 import { AddToBasketSection } from "@/components/products/AddToBasketSection";
 
 interface ProductPageProps {
@@ -94,11 +94,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Breadcrumb Navigation */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500">
-          <Link href="/" className="hover:text-green-700 transition-colors">
+          <Link href="/" className="hover:text-[#323C4B] transition-colors">
             Home
           </Link>
           <span>/</span>
-          <Link href="/shop" className="hover:text-green-700 transition-colors">
+          <Link href="/shop" className="hover:text-[#323C4B] transition-colors">
             Shop
           </Link>
           <span>/</span>
@@ -106,7 +106,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             <>
               <Link
                 href={`/category/${product.category.slug}`}
-                className="hover:text-green-700 transition-colors"
+                className="hover:text-[#323C4B] transition-colors"
               >
                 {product.category.name}
               </Link>
@@ -122,40 +122,22 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
         <div className="mt-8 grid grid-cols-1 gap-12 lg:grid-cols-2">
           {/* Left: Product Image / Gallery */}
           <div>
-            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center p-8">
-              {/* Image Graphic / Placeholder */}
-              <div className="flex flex-col items-center justify-center text-center">
-                <div className="rounded-full bg-green-100 p-8 text-green-700">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.2}
-                    stroke="currentColor"
-                    className="h-28 w-28"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"
-                    />
-                  </svg>
-                </div>
-                <span className="mt-3 text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                  {product.brand || "SIRAGRO Fresh"}
-                </span>
-              </div>
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl border-2 border-slate-200 bg-gray-50 shadow-sm flex items-center justify-center">
+              <CategoryMockup
+                slug={product.category?.slug}
+                brand={product.brand ?? undefined}
+                className="w-full h-full"
+              />
 
               {/* Badges */}
-              <div className="absolute left-4 top-4 flex flex-col gap-2">
+              <div className="absolute left-4 top-4 flex flex-col gap-2 z-10">
                 {isDiscounted && (
-                  <span className="inline-flex items-center rounded-lg bg-amber-500 px-3 py-1 text-sm font-bold text-white shadow-sm">
+                  <span className="inline-flex items-center rounded-lg bg-[#323C4B] px-3 py-1 text-xs font-black text-white shadow-md">
                     Special Offer • Save £{(product.compare_at_price! - product.price).toFixed(2)}
                   </span>
                 )}
                 {product.is_age_restricted && (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-sm font-bold text-white shadow-sm">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-md">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
                     </svg>
@@ -170,7 +152,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <div className="flex flex-col justify-between">
             <div>
               {product.brand && (
-                <p className="text-sm font-semibold uppercase tracking-wider text-green-700">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#323C4B]">
                   {product.brand}
                 </p>
               )}

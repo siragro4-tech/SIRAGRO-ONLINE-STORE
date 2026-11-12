@@ -53,7 +53,7 @@ export default async function OrderConfirmationPage({
             <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
               Order Reference
             </p>
-            <p className="font-mono text-xl font-bold text-green-700">
+            <p className="font-mono text-xl font-black text-[#323C4B]">
               {order?.orderNumber || (session_id ? `SIR-${session_id.slice(-6).toUpperCase()}` : "SIR-PENDING")}
             </p>
           </div>
@@ -135,7 +135,7 @@ export default async function OrderConfirmationPage({
               </div>
               <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">
                 <span>Total Paid</span>
-                <span className="text-green-700">£{order.total.toFixed(2)}</span>
+                <span className="text-[#323C4B] font-black">£{order.total.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -145,14 +145,13 @@ export default async function OrderConfirmationPage({
         <div className="mt-8 flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
           <Link
             href="/shop"
-            className="flex-1 flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "var(--color-primary)" }}
+            className="flex-1 flex items-center justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-[1.01] active:scale-[0.99]"
           >
             Continue Shopping
           </Link>
           <Link
             href="/account"
-            className="flex-1 flex items-center justify-center rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            className="flex-1 flex items-center justify-center rounded-xl border-2 border-slate-300 bg-white px-6 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
           >
             View in My Account
           </Link>

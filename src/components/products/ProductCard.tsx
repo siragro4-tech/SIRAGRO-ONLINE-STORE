@@ -6,7 +6,7 @@ interface ProductCardProps {
 }
 
 /** Premium brand-coloured product mockup illustration per category */
-function CategoryMockup({ slug, brand, className }: { slug?: string; brand?: string; className?: string }) {
+export function CategoryMockup({ slug, brand, className }: { slug?: string; brand?: string; className?: string }) {
   const cls = className ?? "w-full h-full";
 
   // Category config: gradient colours + icon path

@@ -69,10 +69,10 @@ export default async function AccountPage() {
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 gap-4">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-green-700">
+          <span className="inline-block rounded-full bg-[#323C4B] text-white px-3 py-0.5 text-[11px] font-black uppercase tracking-wider">
             Customer Dashboard
           </span>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+          <h1 className="mt-2 text-2xl font-black tracking-tight text-[#323C4B] sm:text-3xl">
             Welcome, {profile?.first_name || "Customer"}!
           </h1>
           <p className="mt-1 text-xs text-gray-500">
@@ -84,7 +84,7 @@ export default async function AccountPage() {
           {profile?.role === "admin" && (
             <Link
               href="/admin"
-              className="rounded-lg bg-green-50 border border-green-300 px-4 py-2 text-xs font-semibold text-green-800 hover:bg-green-100 transition-colors"
+              className="rounded-xl bg-[#323C4B] text-white px-4 py-2 text-xs font-bold hover:bg-[#242c37] transition-all shadow-sm"
             >
               Open Admin Dashboard &rarr;
             </Link>
@@ -144,9 +144,8 @@ export default async function AccountPage() {
                           #{ord.order_number}
                         </Link>
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            statusColors[ord.status] || "bg-gray-100 text-gray-800"
-                          }`}
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusColors[ord.status] || "bg-gray-100 text-gray-800"
+                            }`}
                         >
                           {statusLabels[ord.status] || ord.status}
                         </span>

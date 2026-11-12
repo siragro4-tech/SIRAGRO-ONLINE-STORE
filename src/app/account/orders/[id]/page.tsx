@@ -70,11 +70,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500 mb-6">
-        <Link href="/" className="hover:text-green-700 transition-colors">
+        <Link href="/" className="hover:text-[#323C4B] transition-colors">
           Home
         </Link>
         <span>/</span>
-        <Link href="/account" className="hover:text-green-700 transition-colors">
+        <Link href="/account" className="hover:text-[#323C4B] transition-colors">
           My Account
         </Link>
         <span>/</span>
