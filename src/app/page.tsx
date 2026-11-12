@@ -62,16 +62,16 @@ export default async function HomePage() {
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider"
                 style={{ backgroundColor: "#16a34a22", color: "#4ade80", border: "1px solid #16a34a44" }}
               >
-                📍 Hayes, Middlesex · UB3 4NS
+                📍 SIRAGRO · Hayes, UB3 4NS
               </span>
 
               <h1
                 id="hero-heading"
                 className="mt-4 text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl xl:text-6xl"
               >
-                SIRAGRO
+                SIRAGRO — Your
                 <span className="block" style={{ color: "#4ade80" }}>
-                  Supermarket
+                  Local Supermarket
                 </span>
                 <span className="text-2xl font-bold sm:text-3xl" style={{ color: "#fbbf24" }}>
                   &amp; Off-Licence
@@ -171,7 +171,7 @@ export default async function HomePage() {
             <span className="text-green-200">|</span>
             <span className="flex items-center gap-2">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z" /></svg>
-              Covering Hayes &amp; surrounding areas up to 5 miles
+              Covering UB3 4NS &amp; surrounding areas up to 5 miles
             </span>
             <span className="text-green-200">|</span>
             <span className="flex items-center gap-2">
@@ -460,7 +460,7 @@ export default async function HomePage() {
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-gray-600">
                 Browse our curated selection of wines from around the world, premium spirits,
-                craft beers, and chilled lagers. Click &amp; collect from our Hayes store or
+                craft beers, and chilled lagers. Click &amp; collect from our SIRAGRO store or
                 get home delivery within 5 miles.
               </p>
 
@@ -530,7 +530,7 @@ export default async function HomePage() {
                 Visit or Order Online
               </h2>
               <p className="mt-1 text-sm" style={{ color: "#9ca3af" }}>
-                Your neighbourhood supermarket &amp; off-licence in Hayes
+                Your neighbourhood supermarket &amp; off-licence in SIRAGRO
               </p>
               <div className="mt-4 space-y-1.5 text-sm" style={{ color: "#d1d5db" }}>
                 <div className="flex items-center gap-2">
@@ -626,7 +626,7 @@ export default async function HomePage() {
               {
                 icon: "🏆",
                 title: "Local Business",
-                sub: "Hayes based since 2010",
+                sub: "SIRAGRO — Est. 2010",
                 bg: "#fefce8",
                 color: "#a16207",
               },

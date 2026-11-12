@@ -25,7 +25,7 @@ export function Footer() {
             </Link>
 
             <p className="mt-5 text-sm leading-relaxed" style={{ color: "#9ca3af" }}>
-              Your trusted local supermarket and licensed off-licence in Hayes, Middlesex.
+              Your trusted local supermarket and licensed off-licence in SIRAGRO, Hayes, Middlesex.
               Serving the UB3 community with fresh groceries, chilled drinks, bakery goods
               and in-store services since 2010.
             </p>
