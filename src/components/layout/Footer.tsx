@@ -5,7 +5,7 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer style={{ backgroundColor: "var(--color-brand)" }} aria-labelledby="footer-heading">
+    <footer className="bg-[#0f172a] text-slate-300 border-t border-slate-800" aria-labelledby="footer-heading">
       <h2 id="footer-heading" className="sr-only">SIRAGRO Footer</h2>
 
       {/* ── Main footer grid ── */}
@@ -24,24 +24,26 @@ export function Footer() {
               </div>
             </Link>
 
-            <p className="mt-5 text-sm leading-relaxed" style={{ color: "#9ca3af" }}>
-              Your trusted local supermarket and licensed off-licence in SIRAGRO, Hayes, Middlesex.
+            <p className="mt-5 text-sm leading-relaxed text-slate-400">
+              Your trusted local supermarket and licensed off-licence at 147 North Hyde Road, Hayes.
               Serving the UB3 community with fresh groceries, chilled drinks, bakery goods
-              and in-store services since 2010.
+              and in-store counter services.
             </p>
 
             {/* Contact info */}
-            <div className="mt-5 space-y-2 text-sm" style={{ color: "#d1d5db" }}>
+            <div className="mt-5 space-y-2 text-sm text-slate-300">
               <div className="flex items-start gap-2">
-                <span className="text-green-400 mt-0.5">📍</span>
+                <span className="text-emerald-400 mt-0.5">📍</span>
                 <span>147 North Hyde Road, Hayes,<br />Middlesex UB3 4NS</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">📞</span>
+                <span className="text-emerald-400">📞</span>
+                <a href="tel:02088136458" className="hover:text-white transition-colors">020 8813 6458</a>
+                <span className="text-slate-600">/</span>
                 <a href="tel:02088484840" className="hover:text-white transition-colors">0208 848 4840</a>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">🕐</span>
+                <span className="text-emerald-400">🕐</span>
                 Monday – Sunday: 7:00am – 10:00pm
               </div>
             </div>

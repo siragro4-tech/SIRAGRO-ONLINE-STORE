@@ -1,67 +1,61 @@
 @import "tailwindcss";
 
 /*
- * SIRAGRO Brand Design Tokens
+ * SIRAGRO Storefront Brand Design Tokens
  * ─────────────────────────────────────────────────
- * Colours taken directly from the real SIRAGRO
- * shop signboard: dark teal-green, clean white,
- * vibrant accents for a lively supermarket feel.
+ * Sampled directly from the real physical storefront fascia board
+ * at 147 North Hyde Road (Hayes, UB3 4NS):
+ *
+ * Fascia: Deep Slate Navy (#1c2633 / #222f3e)
+ * Lettering: 3D Embossed Crisp White (#ffffff)
+ * Awning & Window livery: Deep Charcoal Black (#111827)
+ * High-street accents:
+ *   - Fresh Produce Green (#16a34a)
+ *   - PayPoint / Deal Gold (#eab308 / #f59e0b)
+ *   - Licensed Off-Licence Ruby (#dc2626 / #991b1b)
  */
 :root {
-  /* ── Core Brand (from signboard) ── */
-  --color-brand: #1a3d2b;           /* Signboard dark teal-green */
-  --color-brand-mid: #245c3f;       /* Slightly lighter teal */
-  --color-brand-light: #2d7a52;     /* Hover / active teal */
+  /* ── Storefront Fascia (exact colour from physical signboard) ── */
+  --color-fascia: #1e293b;          /* Dark slate navy fascia */
+  --color-fascia-dark: #0f172a;     /* Deep navy night */
+  --color-fascia-light: #334155;    /* Slate accent */
+  --color-brand: #1e293b;
+  --color-brand-hover: #334155;
 
-  /* ── Fresh Green — primary CTA ── */
-  --color-primary: #16a34a;
+  /* ── Accent colours ── */
+  --color-primary: #16a34a;         /* Fresh produce green */
   --color-primary-dark: #15803d;
   --color-primary-bright: #22c55e;
   --color-primary-light: #dcfce7;
 
-  /* ── Vibrant Amber — deals & promotions ── */
-  --color-gold: #f59e0b;
+  /* ── Commercial High-Street Accents ── */
+  --color-gold: #f59e0b;            /* PayPoint / Deals warm gold */
   --color-gold-dark: #d97706;
   --color-gold-light: #fef3c7;
 
-  /* ── Bright Orange — flash offers ── */
-  --color-orange: #ea580c;
-  --color-orange-light: #fed7aa;
-
-  /* ── Off-Licence / Age-Restricted — rich red ── */
-  --color-off-licence: #b91c1c;
+  --color-off-licence: #dc2626;     /* Off-licence red */
+  --color-off-licence-dark: #991b1b;
   --color-off-licence-light: #fee2e2;
-
-  /* ── Sky Blue — frozen / dairy ── */
-  --color-blue: #0284c7;
-  --color-blue-light: #e0f2fe;
-
-  /* ── Purple — beverages ── */
-  --color-purple: #7c3aed;
-  --color-purple-light: #ede9fe;
 
   /* ── Neutrals ── */
   --color-bg: #ffffff;
-  --color-bg-muted: #f3f8f4;        /* Slight green tint */
-  --color-bg-dark: #1a3d2b;
-  --color-text: #111827;
-  --color-text-muted: #4b5563;
+  --color-bg-muted: #f8fafc;        /* Crisp slate tint */
+  --color-bg-dark: #1e293b;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
   --color-text-inverse: #ffffff;
-  --color-border: #d1fae5;          /* Green-tinted border */
-  --color-border-neutral: #e5e7eb;
+  --color-border: #e2e8f0;
+  --color-border-dark: #334155;
 
-  /* ── Focus ── */
-  --color-focus: #16a34a;
+  /* ── Focus & Interactive ── */
+  --color-focus: #2563eb;
 
   /* ── Shadows ── */
-  --shadow-card: 0 2px 8px 0 rgb(26 61 43 / 0.10);
-  --shadow-card-hover: 0 8px 24px 0 rgb(26 61 43 / 0.18);
-  --shadow-btn: 0 4px 14px 0 rgb(22 163 74 / 0.35);
+  --shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.08);
+  --shadow-card-hover: 0 10px 25px -3px rgb(15 23 42 / 0.12);
+  --shadow-fascia: 0 4px 20px -2px rgb(15 23 42 / 0.35);
 }
 
-/* ───────────────────────────────────────
-   Global resets & base
-─────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -83,9 +77,6 @@ body {
   line-height: 1.6;
 }
 
-/* ───────────────────────────────────────
-   Focus styles
-─────────────────────────────────────── */
 :focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
@@ -96,9 +87,6 @@ body {
   outline: none;
 }
 
-/* ───────────────────────────────────────
-   Skip-to-content
-─────────────────────────────────────── */
 .skip-link {
   position: absolute;
   top: -100%;
@@ -114,9 +102,6 @@ body {
 }
 .skip-link:focus { top: 0; }
 
-/* ───────────────────────────────────────
-   Horizontal scroll utility
-─────────────────────────────────────── */
 .scroll-row {
   display: flex;
   gap: 1rem;
@@ -127,38 +112,17 @@ body {
 }
 .scroll-row::-webkit-scrollbar { height: 4px; }
 .scroll-row::-webkit-scrollbar-track { background: var(--color-bg-muted); border-radius: 2px; }
-.scroll-row::-webkit-scrollbar-thumb { background: var(--color-primary-bright); border-radius: 2px; }
+.scroll-row::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 2px; }
 .scroll-row > * { scroll-snap-align: start; flex-shrink: 0; }
 
-/* ───────────────────────────────────────
-   Gradient text utility
-─────────────────────────────────────── */
-.gradient-text {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #f59e0b 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* 3D embossed text effect matching the signboard letters */
+.fascia-3d-text {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  text-shadow:
+    0 1px 0 #cbd5e1,
+    0 2px 0 #94a3b8,
+    0 3px 0 #64748b,
+    0 5px 12px rgba(0, 0, 0, 0.45);
 }
-
-/* ───────────────────────────────────────
-   Animated shimmer for promo badges
-─────────────────────────────────────── */
-@keyframes shimmer {
-  0%   { background-position: -200% center; }
-  100% { background-position: 200% center; }
-}
-.shimmer {
-  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 40%, #f59e0b 80%);
-  background-size: 200% auto;
-  animation: shimmer 2.5s linear infinite;
-}
-
-/* ───────────────────────────────────────
-   Pulse ring on CTA button
-─────────────────────────────────────── */
-@keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgb(34 197 94 / 0.5); }
-  70%  { box-shadow: 0 0 0 10px rgb(34 197 94 / 0); }
-  100% { box-shadow: 0 0 0 0 rgb(34 197 94 / 0); }
-}
-.btn-pulse { animation: pulse-ring 2s ease-out infinite; }
