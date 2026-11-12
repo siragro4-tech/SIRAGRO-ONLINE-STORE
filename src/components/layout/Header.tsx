@@ -6,16 +6,15 @@ import { Logo } from "./Logo";
 import { HeaderSearchBar } from "./HeaderSearchBar";
 import { MobileMenu } from "./MobileMenu";
 
-/** Supermarket aisle categories shown in the bottom nav strip. */
 const CATEGORIES = [
-  { slug: "fresh-produce",        label: "Fresh Produce",         emoji: "🥦" },
-  { slug: "dairy-eggs",           label: "Dairy & Eggs",          emoji: "🥛" },
-  { slug: "bakery",               label: "Bakery",                emoji: "🍞" },
-  { slug: "meat-fish",            label: "Meat & Fish",           emoji: "🥩" },
-  { slug: "off-licence-beverages",label: "Off-Licence",           emoji: "🍷" },
-  { slug: "cupboard-groceries",   label: "Cupboard & Groceries",  emoji: "🥫" },
-  { slug: "frozen-goods",         label: "Frozen Goods",          emoji: "❄️" },
-  { slug: "household-cleaning",   label: "Household & Cleaning",  emoji: "🧼" },
+  { slug: "fresh-produce",         label: "Fresh Produce",        emoji: "🥦", color: "#16a34a" },
+  { slug: "dairy-eggs",            label: "Dairy & Eggs",         emoji: "🥛", color: "#0284c7" },
+  { slug: "bakery",                label: "Bakery",               emoji: "🍞", color: "#d97706" },
+  { slug: "meat-fish",             label: "Meat & Fish",          emoji: "🥩", color: "#dc2626" },
+  { slug: "off-licence-beverages", label: "Off-Licence",          emoji: "🍷", color: "#7c3aed" },
+  { slug: "cupboard-groceries",    label: "Cupboard & Groceries", emoji: "🥫", color: "#ea580c" },
+  { slug: "frozen-goods",          label: "Frozen Goods",         emoji: "❄️", color: "#0891b2" },
+  { slug: "household-cleaning",    label: "Household & Cleaning", emoji: "🧼", color: "#059669" },
 ] as const;
 
 const NAV_LINKS = [
@@ -34,15 +33,14 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
   const itemCount = initialItemCount;
 
   return (
-    <header className="sticky top-0 z-50 w-full" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }}>
+    <header className="sticky top-0 z-50 w-full" style={{ boxShadow: "0 4px 16px rgba(26,61,43,0.35)" }}>
 
-      {/* ── Layer 1: Utility bar ─────────────────────────── */}
+      {/* ── Layer 1: Signboard-green utility bar ── */}
       <div
         className="hidden md:block text-xs"
-        style={{ backgroundColor: "var(--color-brand)", color: "#d1d5db" }}
+        style={{ background: "linear-gradient(90deg, #122b1e 0%, #1a3d2b 50%, #122b1e 100%)", color: "#a7f3d0" }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5 sm:px-6 lg:px-8">
-          {/* Left — store info */}
           <div className="flex items-center gap-5">
             <span className="flex items-center gap-1.5">
               <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -64,48 +62,36 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
               Mon–Sun: 7am – 10pm
             </span>
           </div>
-
-          {/* Right — account links */}
           <div className="flex items-center gap-4">
             <Link href="/login" className="hover:text-white transition-colors">Sign In</Link>
-            <span className="text-gray-600">|</span>
+            <span style={{ color: "#245c3f" }}>|</span>
             <Link href="/register" className="hover:text-white transition-colors">Register</Link>
-            <span className="text-gray-600">|</span>
+            <span style={{ color: "#245c3f" }}>|</span>
             <Link href="/delivery-info" className="hover:text-white transition-colors flex items-center gap-1">
-              <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.25V3.75m0 3.75h3.75m-3.75 0h-6.75m6.75 0v3.75m0 0h3.75m-3.75 0h-6.75" />
-              </svg>
-              Delivery Info
+              🚚 Delivery Info
             </Link>
           </div>
         </div>
       </div>
 
-      {/* ── Layer 2: Main header ─────────────────────────── */}
-      <div
-        className="border-b"
-        style={{ backgroundColor: "var(--color-brand)", borderColor: "#2a2a2a" }}
-      >
+      {/* ── Layer 2: Main brand header (signboard teal) ── */}
+      <div style={{ background: "linear-gradient(135deg, #1a3d2b 0%, #245c3f 60%, #1a3d2b 100%)" }}>
         <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
 
           {/* Logo + wordmark */}
-          <Link
-            href="/"
-            className="flex flex-shrink-0 items-center gap-3 group"
-            aria-label="SIRAGRO home"
-          >
+          <Link href="/" className="flex flex-shrink-0 items-center gap-3 group" aria-label="SIRAGRO home">
             <Logo size={52} dark />
             <div className="hidden sm:block leading-tight">
-              <div className="text-xl font-black tracking-widest text-white uppercase">
+              <div className="text-xl font-black tracking-widest text-white uppercase drop-shadow-md">
                 SIRAGRO
               </div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#4ade80" }}>
+              <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6ee7b7" }}>
                 Supermarket &amp; Off-Licence
               </div>
             </div>
           </Link>
 
-          {/* Search bar — takes remaining width */}
+          {/* Search bar */}
           <div className="flex-1 min-w-0">
             <HeaderSearchBar />
           </div>
@@ -113,7 +99,7 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
           {/* Account icon */}
           <Link
             href="/account"
-            className="hidden md:flex flex-shrink-0 flex-col items-center gap-0.5 rounded-lg p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="hidden md:flex flex-shrink-0 flex-col items-center gap-0.5 rounded-xl p-2.5 text-white/80 hover:text-white hover:bg-white/15 transition-all"
             aria-label="My account"
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
@@ -122,10 +108,11 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
             <span className="text-[10px] font-semibold">Account</span>
           </Link>
 
-          {/* Basket icon with count */}
+          {/* Basket */}
           <Link
             href="/basket"
-            className="flex-shrink-0 relative flex flex-col items-center gap-0.5 rounded-lg p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex-shrink-0 relative flex flex-col items-center gap-0.5 rounded-xl p-2.5 transition-all"
+            style={{ background: "rgba(255,255,255,0.12)", color: "#fff" }}
             aria-label={`Shopping basket — ${itemCount} item${itemCount !== 1 ? "s" : ""}`}
           >
             <div className="relative">
@@ -135,70 +122,75 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
               {itemCount > 0 && (
                 <span
                   className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black text-white"
-                  style={{ backgroundColor: "var(--color-primary)" }}
+                  style={{ backgroundColor: "#f59e0b" }}
                   aria-hidden="true"
                 >
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-semibold">Basket</span>
+            <span className="text-[10px] font-bold">Basket</span>
           </Link>
 
           {/* Mobile hamburger */}
           <button
             type="button"
-            className="rounded-lg p-2 text-white md:hidden hover:bg-white/10 transition-colors"
+            className="rounded-xl p-2.5 text-white md:hidden hover:bg-white/15 transition-colors"
             onClick={() => setMobileOpen(true)}
             aria-expanded={mobileOpen}
             aria-controls="mobile-menu"
             aria-label="Open menu"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* ── Layer 3: Category navigation strip ───────────── */}
+      {/* ── Layer 3: Colourful category strip ── */}
       <nav
-        className="hidden md:block overflow-x-auto border-b"
-        style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}
+        className="hidden md:block overflow-x-auto"
+        style={{ background: "linear-gradient(90deg, #0f2419 0%, #1a3d2b 100%)", borderTop: "1px solid #245c3f" }}
         aria-label="Shop by category"
       >
-        <div className="mx-auto flex max-w-7xl items-center gap-0 px-4 sm:px-6 lg:px-8">
-          {/* All Departments CTA */}
+        <div className="mx-auto flex max-w-7xl items-center px-4 sm:px-6 lg:px-8">
+          {/* All Departments */}
           <Link
             href="/shop"
-            className="flex flex-shrink-0 items-center gap-2 border-r px-4 py-3 text-sm font-bold text-white hover:bg-white/10 transition-colors whitespace-nowrap"
-            style={{ borderColor: "#333" }}
+            className="flex flex-shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-black text-white whitespace-nowrap transition-all hover:bg-white/10 border-r"
+            style={{ borderColor: "#245c3f" }}
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
             All Departments
           </Link>
 
-          {/* Category links */}
+          {/* Category links — each with its accent colour on hover */}
           {CATEGORIES.map((cat) => (
             <Link
               key={cat.slug}
               href={`/category/${cat.slug}`}
-              className="flex flex-shrink-0 items-center gap-1.5 px-3.5 py-3 text-xs font-semibold transition-colors whitespace-nowrap hover:bg-white/10"
-              style={{ color: "#d1d5db" }}
+              className="group flex flex-shrink-0 items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold whitespace-nowrap transition-all"
+              style={{ color: "#d1fae5" }}
             >
-              <span>{cat.emoji}</span>
-              <span>{cat.label}</span>
+              <span
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-sm transition-transform group-hover:scale-125"
+                style={{ background: `${cat.color}33` }}
+              >
+                {cat.emoji}
+              </span>
+              <span className="group-hover:text-white transition-colors">{cat.label}</span>
             </Link>
           ))}
 
-          {/* Off-Licence special link (highlighted) */}
-          <div className="ml-auto flex-shrink-0 px-4 py-2">
+          {/* Off-Licence badge */}
+          <div className="ml-auto flex-shrink-0 px-4 py-1.5">
             <Link
               href="/category/off-licence-beverages"
-              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold text-white transition-colors"
-              style={{ backgroundColor: "var(--color-off-licence)" }}
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-black text-white shadow-lg transition-all hover:scale-105"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #9333ea)" }}
             >
               🍷 Off-Licence
             </Link>
@@ -206,7 +198,7 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
         </div>
       </nav>
 
-      {/* Mobile slide-out menu */}
+      {/* Mobile menu */}
       <MobileMenu
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}

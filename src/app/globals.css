@@ -3,47 +3,60 @@
 /*
  * SIRAGRO Brand Design Tokens
  * ─────────────────────────────────────────────────
- * Colour palette derived from the SIRAGRO circular
- * black-and-white badge logo.
- *
- * Brand identity: Bold Black + Fresh Green + Warm Amber
- * Inspired by premium local supermarket / off-licence aesthetic.
+ * Colours taken directly from the real SIRAGRO
+ * shop signboard: dark teal-green, clean white,
+ * vibrant accents for a lively supermarket feel.
  */
 :root {
-  /* ── Core Brand ── */
-  --color-brand: #111111;           /* Rich black — logo, header, footer */
-  --color-brand-hover: #2a2a2a;
+  /* ── Core Brand (from signboard) ── */
+  --color-brand: #1a3d2b;           /* Signboard dark teal-green */
+  --color-brand-mid: #245c3f;       /* Slightly lighter teal */
+  --color-brand-light: #2d7a52;     /* Hover / active teal */
 
-  /* ── Action / Fresh Green — primary CTA colour ── */
+  /* ── Fresh Green — primary CTA ── */
   --color-primary: #16a34a;
   --color-primary-dark: #15803d;
+  --color-primary-bright: #22c55e;
   --color-primary-light: #dcfce7;
 
-  /* ── Deals & Promotions — warm amber ── */
-  --color-gold: #d97706;
+  /* ── Vibrant Amber — deals & promotions ── */
+  --color-gold: #f59e0b;
+  --color-gold-dark: #d97706;
   --color-gold-light: #fef3c7;
 
-  /* ── Off-Licence / Age Restricted — deep red ── */
-  --color-off-licence: #991b1b;
+  /* ── Bright Orange — flash offers ── */
+  --color-orange: #ea580c;
+  --color-orange-light: #fed7aa;
+
+  /* ── Off-Licence / Age-Restricted — rich red ── */
+  --color-off-licence: #b91c1c;
   --color-off-licence-light: #fee2e2;
+
+  /* ── Sky Blue — frozen / dairy ── */
+  --color-blue: #0284c7;
+  --color-blue-light: #e0f2fe;
+
+  /* ── Purple — beverages ── */
+  --color-purple: #7c3aed;
+  --color-purple-light: #ede9fe;
 
   /* ── Neutrals ── */
   --color-bg: #ffffff;
-  --color-bg-muted: #f8f9fa;
-  --color-bg-dark: #111111;
+  --color-bg-muted: #f3f8f4;        /* Slight green tint */
+  --color-bg-dark: #1a3d2b;
   --color-text: #111827;
-  --color-text-muted: #6b7280;
+  --color-text-muted: #4b5563;
   --color-text-inverse: #ffffff;
-  --color-border: #e5e7eb;
-  --color-border-dark: #374151;
+  --color-border: #d1fae5;          /* Green-tinted border */
+  --color-border-neutral: #e5e7eb;
 
-  /* ── Utility ── */
-  --color-danger: #dc2626;
-  --color-focus: #2563eb;
+  /* ── Focus ── */
+  --color-focus: #16a34a;
 
   /* ── Shadows ── */
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
-  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.12);
+  --shadow-card: 0 2px 8px 0 rgb(26 61 43 / 0.10);
+  --shadow-card-hover: 0 8px 24px 0 rgb(26 61 43 / 0.18);
+  --shadow-btn: 0 4px 14px 0 rgb(22 163 74 / 0.35);
 }
 
 /* ───────────────────────────────────────
@@ -71,7 +84,7 @@ body {
 }
 
 /* ───────────────────────────────────────
-   Accessible focus styles
+   Focus styles
 ─────────────────────────────────────── */
 :focus-visible {
   outline: 3px solid var(--color-focus);
@@ -84,7 +97,7 @@ body {
 }
 
 /* ───────────────────────────────────────
-   Skip-to-content (accessibility)
+   Skip-to-content
 ─────────────────────────────────────── */
 .skip-link {
   position: absolute;
@@ -99,13 +112,10 @@ body {
   text-decoration: none;
   transition: top 0.2s;
 }
-
-.skip-link:focus {
-  top: 0;
-}
+.skip-link:focus { top: 0; }
 
 /* ───────────────────────────────────────
-   Horizontal scroll utility (product carousels)
+   Horizontal scroll utility
 ─────────────────────────────────────── */
 .scroll-row {
   display: flex;
@@ -115,22 +125,40 @@ body {
   -webkit-overflow-scrolling: touch;
   padding-bottom: 0.5rem;
 }
+.scroll-row::-webkit-scrollbar { height: 4px; }
+.scroll-row::-webkit-scrollbar-track { background: var(--color-bg-muted); border-radius: 2px; }
+.scroll-row::-webkit-scrollbar-thumb { background: var(--color-primary-bright); border-radius: 2px; }
+.scroll-row > * { scroll-snap-align: start; flex-shrink: 0; }
 
-.scroll-row::-webkit-scrollbar {
-  height: 4px;
+/* ───────────────────────────────────────
+   Gradient text utility
+─────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.scroll-row::-webkit-scrollbar-track {
-  background: var(--color-bg-muted);
-  border-radius: 2px;
+/* ───────────────────────────────────────
+   Animated shimmer for promo badges
+─────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 40%, #f59e0b 80%);
+  background-size: 200% auto;
+  animation: shimmer 2.5s linear infinite;
 }
 
-.scroll-row::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 2px;
+/* ───────────────────────────────────────
+   Pulse ring on CTA button
+─────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgb(34 197 94 / 0.5); }
+  70%  { box-shadow: 0 0 0 10px rgb(34 197 94 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(34 197 94 / 0); }
 }
-
-.scroll-row > * {
-  scroll-snap-align: start;
-  flex-shrink: 0;
-}
+.btn-pulse { animation: pulse-ring 2s ease-out infinite; }
