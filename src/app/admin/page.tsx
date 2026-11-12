@@ -145,11 +145,10 @@ export default async function AdminDashboardPage() {
         {/* Low Stock Card */}
         <Link
           href="/admin/products?filter=low_stock"
-          className={`group rounded-xl border p-5 shadow-xs transition-all hover:shadow-sm ${
-            lowStockCount > 0
+          className={`group rounded-xl border p-5 shadow-xs transition-all hover:shadow-sm ${lowStockCount > 0
               ? "border-amber-200 bg-amber-50/40 hover:border-amber-400"
               : "border-gray-200 bg-white hover:border-gray-300"
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">

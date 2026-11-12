@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { ScrollEffects } from "@/components/effects/ScrollEffects";
 import { getBasket } from "@/lib/basket";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default async function RootLayout({
         </a>
 
         <Header initialItemCount={basketCount} />
+        <ScrollEffects />
 
         <main id="main-content" className="flex-1">
           {children}

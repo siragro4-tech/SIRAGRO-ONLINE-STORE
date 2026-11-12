@@ -25,40 +25,9 @@ export function Footer() {
             </Link>
 
             <p className="mt-4 text-sm leading-relaxed text-white/80">
-              Your trusted local supermarket and licensed off-licence at 147 North Hyde Road, Hayes.
-              Serving the UB3 community with fresh groceries, chilled drinks, bakery goods
-              and in-store counter services.
+              Your trusted local supermarket and licensed off-licence in Hayes, UB3.
+              Fresh groceries, chilled beverages, pantry goods and friendly counter service.
             </p>
-
-            {/* Contact info */}
-            <div className="mt-5 space-y-2 text-sm text-white/90">
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5">📍</span>
-                <span>147 North Hyde Road, Hayes,<br />Middlesex UB3 4NS</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>📞</span>
-                <a href="tel:02088136458" className="hover:text-white font-bold transition-colors">020 8813 6458</a>
-                <span className="text-white/40">/</span>
-                <a href="tel:02088484840" className="hover:text-white font-bold transition-colors">0208 848 4840</a>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>🕐</span>
-                Monday – Sunday: 7:00am – 10:00pm
-              </div>
-            </div>
-
-            {/* In-store services pills */}
-            <div className="mt-5 flex flex-wrap gap-2">
-              {["PayPoint", "National Lottery", "Ria Money Transfer", "KeyNest", "Phone Repair"].map((s) => (
-                <span
-                  key={s}
-                  className="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-[#323C4B] text-white border border-[#4a586d]"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
           </div>
 
           {/* Col 2 — Shop Aisles */}
@@ -111,9 +80,6 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 border-t border-[#3d495b] pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/70">
           <p>© {currentYear} SIRAGRO. 147 North Hyde Road, Hayes, Middlesex UB3 4NS. All rights reserved.</p>
-          <div className="flex items-center gap-3">
-            <span>🔒 Secure checkout powered by Stripe</span>
-          </div>
         </div>
       </div>
     </footer>
