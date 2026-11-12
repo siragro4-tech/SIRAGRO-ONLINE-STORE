@@ -5,126 +5,172 @@ interface ProductCardProps {
   product: Product;
 }
 
-/** SVG icon per category slug — crisp, clean, no AI images */
-function CategoryIcon({ slug, className }: { slug?: string; className?: string }) {
-  const cls = className ?? "h-16 w-16";
+/** Premium brand-coloured product mockup illustration per category */
+function CategoryMockup({ slug, brand, className }: { slug?: string; brand?: string; className?: string }) {
+  const cls = className ?? "w-full h-full";
 
-  switch (slug) {
-    case "fresh-produce":
-      return (
-        // Leaf / apple icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <circle cx="24" cy="22" r="13" fill="#dcfce7" stroke="#16a34a" strokeWidth="2" />
-          <path d="M24 10 C18 10 13 15 13 22 C13 29 18 34 24 34 C30 34 35 29 35 22 C35 15 30 10 24 10Z" fill="#bbf7d0" />
-          <path d="M24 10 C24 10 28 6 32 8" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" />
-          <path d="M24 34 L24 42" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" />
-          <path d="M18 20 Q24 16 30 20 Q24 28 18 20Z" fill="#16a34a" opacity="0.6" />
+  // Category config: gradient colours + icon path
+  const configs: Record<string, { bg: string; accent: string; label: string; icon: React.ReactNode }> = {
+    "fresh-produce": {
+      bg: "from-[#1e3a2e] to-[#2d5a3d]",
+      accent: "#4ade80",
+      label: brand || "FARM FRESH",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <circle cx="32" cy="30" r="16" fill="white" fillOpacity="0.15" />
+          <ellipse cx="32" cy="32" rx="11" ry="13" fill="white" fillOpacity="0.9" />
+          <path d="M32 19 C32 19 36 13 42 15" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M26 28 Q32 22 38 28 Q32 38 26 28Z" fill="#323C4B" fillOpacity="0.5" />
+          <line x1="32" y1="45" x2="32" y2="50" stroke="white" strokeWidth="2" strokeLinecap="round" />
+          <ellipse cx="32" cy="51" rx="6" ry="2" fill="white" fillOpacity="0.3" />
         </svg>
-      );
+      ),
+    },
+    "dairy-eggs": {
+      bg: "from-[#1a2d4a] to-[#243c5e]",
+      accent: "#93c5fd",
+      label: brand || "COUNTRY PURE",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <rect x="22" y="18" width="20" height="32" rx="5" fill="white" fillOpacity="0.9" />
+          <rect x="24" y="10" width="16" height="10" rx="3" fill="white" fillOpacity="0.7" />
+          <rect x="22" y="10" width="20" height="4" rx="2" fill="white" />
+          <rect x="24" y="28" width="16" height="8" rx="2" fill="#93c5fd" fillOpacity="0.8" />
+          <text x="32" y="23" textAnchor="middle" fontSize="5" fill="#1a2d4a" fontWeight="bold">MILK</text>
+          <ellipse cx="32" cy="52" rx="8" ry="2.5" fill="white" fillOpacity="0.2" />
+        </svg>
+      ),
+    },
+    "bakery": {
+      bg: "from-[#3d2a0e] to-[#5a3d14]",
+      accent: "#fbbf24",
+      label: brand || "FRESHLY BAKED",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <ellipse cx="32" cy="40" rx="20" ry="10" fill="white" fillOpacity="0.9" />
+          <path d="M12 40 Q12 24 32 24 Q52 24 52 40" fill="white" fillOpacity="0.7" />
+          <path d="M18 32 Q23 26 28 32" stroke="#5a3d14" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <path d="M36 30 Q41 24 46 30" stroke="#5a3d14" strokeWidth="2" strokeLinecap="round" fill="none" />
+          <ellipse cx="32" cy="52" rx="8" ry="2.5" fill="white" fillOpacity="0.2" />
+        </svg>
+      ),
+    },
+    "meat-fish": {
+      bg: "from-[#3b1212] to-[#5a1a1a]",
+      accent: "#f87171",
+      label: brand || "PRIME CUT",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <ellipse cx="32" cy="36" rx="18" ry="12" fill="white" fillOpacity="0.9" />
+          <ellipse cx="32" cy="36" rx="12" ry="7" fill="#f87171" fillOpacity="0.6" />
+          <line x1="29" y1="16" x2="29" y2="27" stroke="white" strokeWidth="3.5" strokeLinecap="round" />
+          <line x1="35" y1="13" x2="35" y2="27" stroke="white" strokeWidth="3.5" strokeLinecap="round" />
+          <ellipse cx="32" cy="13" rx="5" ry="2.5" fill="white" fillOpacity="0.7" />
+          <ellipse cx="32" cy="52" rx="8" ry="2.5" fill="white" fillOpacity="0.2" />
+        </svg>
+      ),
+    },
+    "off-licence-beverages": {
+      bg: "from-[#1e1535] to-[#2d1f52]",
+      accent: "#a78bfa",
+      label: brand || "PREMIUM SELECT",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <rect x="27" y="8" width="10" height="8" rx="2" fill="white" fillOpacity="0.8" />
+          <path d="M27 16 L23 24 L23 50 Q23 54 32 54 Q41 54 41 50 L41 24 L37 16 Z" fill="white" fillOpacity="0.9" />
+          <rect x="23" y="30" width="18" height="1.5" fill="#2d1f52" fillOpacity="0.3" />
+          <ellipse cx="32" cy="43" rx="6" ry="8" fill="#a78bfa" fillOpacity="0.4" />
+          <rect x="28" y="8" width="8" height="3" rx="1" fill="#2d1f52" fillOpacity="0.5" />
+        </svg>
+      ),
+    },
+    "cupboard-groceries": {
+      bg: "from-[#2d1a06] to-[#4a2d0a]",
+      accent: "#fb923c",
+      label: brand || "PANTRY STAPLE",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <ellipse cx="32" cy="18" rx="13" ry="4.5" fill="white" fillOpacity="0.9" />
+          <rect x="19" y="18" width="26" height="26" fill="white" fillOpacity="0.85" />
+          <ellipse cx="32" cy="44" rx="13" ry="4.5" fill="white" fillOpacity="0.9" />
+          <rect x="19" y="24" width="26" height="1" fill="#4a2d0a" fillOpacity="0.3" />
+          <rect x="19" y="34" width="26" height="1" fill="#4a2d0a" fillOpacity="0.3" />
+          <text x="32" y="32" textAnchor="middle" fontSize="5.5" fill="#4a2d0a" fontWeight="bold">STORE</text>
+        </svg>
+      ),
+    },
+    "frozen-goods": {
+      bg: "from-[#0d2540] to-[#153555]",
+      accent: "#7dd3fc",
+      label: brand || "FROZEN BEST",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <circle cx="32" cy="32" r="20" fill="white" fillOpacity="0.12" />
+          <line x1="32" y1="14" x2="32" y2="50" stroke="white" strokeWidth="3" strokeLinecap="round" />
+          <line x1="14" y1="32" x2="50" y2="32" stroke="white" strokeWidth="3" strokeLinecap="round" />
+          <line x1="18" y1="18" x2="46" y2="46" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="46" y1="18" x2="18" y2="46" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="32" cy="32" r="5" fill="white" />
+          <circle cx="32" cy="15" r="2.5" fill="white" fillOpacity="0.8" />
+          <circle cx="32" cy="49" r="2.5" fill="white" fillOpacity="0.8" />
+          <circle cx="15" cy="32" r="2.5" fill="white" fillOpacity="0.8" />
+          <circle cx="49" cy="32" r="2.5" fill="white" fillOpacity="0.8" />
+        </svg>
+      ),
+    },
+    "household-cleaning": {
+      bg: "from-[#0d3025] to-[#164237]",
+      accent: "#34d399",
+      label: brand || "HOME CARE",
+      icon: (
+        <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+          <rect x="28" y="26" width="16" height="24" rx="4" fill="white" fillOpacity="0.9" />
+          <rect x="30" y="18" width="10" height="10" rx="3" fill="white" fillOpacity="0.75" />
+          <path d="M30 23 L18 23 L18 30" stroke="white" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+          <path d="M18 30 L13 30" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="11" cy="28" r="1.5" fill="white" fillOpacity="0.9" />
+          <circle cx="9" cy="25" r="1.5" fill="white" fillOpacity="0.6" />
+          <circle cx="11" cy="22" r="1.5" fill="white" fillOpacity="0.4" />
+          <rect x="30" y="34" width="10" height="6" rx="1.5" fill="#164237" fillOpacity="0.3" />
+        </svg>
+      ),
+    },
+  };
 
-    case "dairy-eggs":
-      return (
-        // Milk bottle icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <rect x="16" y="14" width="16" height="26" rx="4" fill="#dbeafe" stroke="#2563eb" strokeWidth="2" />
-          <rect x="18" y="8" width="12" height="8" rx="2" fill="#bfdbfe" stroke="#2563eb" strokeWidth="2" />
-          <path d="M18 24 Q24 20 30 24" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          <circle cx="24" cy="30" r="3" fill="#2563eb" opacity="0.3" />
-          <text x="24" y="35" textAnchor="middle" fontSize="6" fill="#1d4ed8" fontWeight="bold">MILK</text>
-        </svg>
-      );
+  const config = configs[slug ?? ""] ?? {
+    bg: "from-[#1e2a38] to-[#2d3f52]",
+    accent: "#94a3b8",
+    label: brand || "QUALITY PICK",
+    icon: (
+      <svg viewBox="0 0 64 64" fill="none" className="w-16 h-16" aria-hidden="true">
+        <rect x="14" y="22" width="36" height="30" rx="5" fill="white" fillOpacity="0.9" />
+        <path d="M22 22 C22 14 42 14 42 22" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" />
+        <path d="M23 34 L29 40 L41 28" stroke="#2d3f52" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <ellipse cx="32" cy="56" rx="10" ry="3" fill="white" fillOpacity="0.2" />
+      </svg>
+    ),
+  };
 
-    case "bakery":
-      return (
-        // Bread loaf icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <ellipse cx="24" cy="30" rx="16" ry="8" fill="#fef3c7" stroke="#d97706" strokeWidth="2" />
-          <path d="M8 30 Q8 18 24 18 Q40 18 40 30" fill="#fde68a" stroke="#d97706" strokeWidth="2" />
-          <path d="M14 24 Q18 20 22 24" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          <path d="M26 22 Q30 18 34 22" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-          <path d="M8 30 L8 34 Q8 38 24 38 Q40 38 40 34 L40 30" fill="#fef3c7" stroke="#d97706" strokeWidth="2" />
-        </svg>
-      );
-
-    case "meat-fish":
-      return (
-        // Meat/steak icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <ellipse cx="24" cy="26" rx="15" ry="10" fill="#fee2e2" stroke="#dc2626" strokeWidth="2" />
-          <ellipse cx="24" cy="26" rx="10" ry="6" fill="#fca5a5" stroke="#dc2626" strokeWidth="1.5" />
-          <line x1="22" y1="12" x2="22" y2="20" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" />
-          <line x1="26" y1="10" x2="26" y2="20" stroke="#9ca3af" strokeWidth="3" strokeLinecap="round" />
-          <ellipse cx="24" cy="11" rx="4" ry="2" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1.5" />
-        </svg>
-      );
-
-    case "off-licence-beverages":
-      return (
-        // Wine bottle icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <rect x="20" y="6" width="8" height="6" rx="1" fill="#c4b5fd" stroke="#7c3aed" strokeWidth="1.5" />
-          <path d="M20 12 L17 18 L17 38 Q17 42 24 42 Q31 42 31 38 L31 18 L28 12 Z" fill="#ede9fe" stroke="#7c3aed" strokeWidth="2" />
-          <path d="M17 26 L31 26" stroke="#7c3aed" strokeWidth="1" strokeDasharray="2 2" />
-          <ellipse cx="24" cy="34" rx="5" ry="6" fill="#c4b5fd" opacity="0.5" />
-          <rect x="21" y="6" width="6" height="2" rx="1" fill="#7c3aed" />
-        </svg>
-      );
-
-    case "cupboard-groceries":
-      return (
-        // Tin / can icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <ellipse cx="24" cy="14" rx="12" ry="4" fill="#fed7aa" stroke="#ea580c" strokeWidth="2" />
-          <rect x="12" y="14" width="24" height="22" fill="#ffedd5" stroke="#ea580c" strokeWidth="2" />
-          <ellipse cx="24" cy="36" rx="12" ry="4" fill="#fed7aa" stroke="#ea580c" strokeWidth="2" />
-          <path d="M12 20 L36 20" stroke="#ea580c" strokeWidth="1" />
-          <path d="M12 28 L36 28" stroke="#ea580c" strokeWidth="1" />
-          <text x="24" y="26" textAnchor="middle" fontSize="7" fill="#c2410c" fontWeight="bold">STORE</text>
-        </svg>
-      );
-
-    case "frozen-goods":
-      return (
-        // Snowflake icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <circle cx="24" cy="24" r="18" fill="#e0f2fe" stroke="#0284c7" strokeWidth="2" />
-          <line x1="24" y1="10" x2="24" y2="38" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="10" y1="24" x2="38" y2="24" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="13.5" y1="13.5" x2="34.5" y2="34.5" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="34.5" y1="13.5" x2="13.5" y2="34.5" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" />
-          <circle cx="24" cy="24" r="4" fill="#0284c7" />
-          <circle cx="24" cy="12" r="2" fill="#0284c7" />
-          <circle cx="24" cy="36" r="2" fill="#0284c7" />
-          <circle cx="12" cy="24" r="2" fill="#0284c7" />
-          <circle cx="36" cy="24" r="2" fill="#0284c7" />
-        </svg>
-      );
-
-    case "household-cleaning":
-      return (
-        // Spray bottle icon
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <rect x="20" y="20" width="14" height="20" rx="3" fill="#d1fae5" stroke="#059669" strokeWidth="2" />
-          <rect x="22" y="14" width="8" height="8" rx="2" fill="#a7f3d0" stroke="#059669" strokeWidth="1.5" />
-          <path d="M22 18 L14 18 L14 24" stroke="#059669" strokeWidth="2" strokeLinecap="round" fill="none" />
-          <path d="M14 24 L10 24" stroke="#059669" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="10" cy="22" r="1" fill="#059669" />
-          <circle cx="8" cy="20" r="1" fill="#059669" opacity="0.6" />
-          <circle cx="10" cy="18" r="1" fill="#059669" opacity="0.4" />
-          <path d="M24 28 Q27 32 24 36" stroke="#059669" strokeWidth="1.5" strokeLinecap="round" fill="none" strokeDasharray="2 2" />
-        </svg>
-      );
-
-    default:
-      // Generic grocery bag — clean and minimal
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" className={cls} aria-hidden="true">
-          <rect x="10" y="18" width="28" height="24" rx="4" fill="#f0fdf4" stroke="#16a34a" strokeWidth="2" />
-          <path d="M17 18 C17 12 31 12 31 18" stroke="#16a34a" strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M18 26 L22 30 L30 22" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-  }
+  return (
+    <div className={`${cls} relative flex flex-col items-center justify-center bg-gradient-to-b ${config.bg} rounded-lg overflow-hidden`}>
+      {/* Subtle pattern overlay */}
+      <div className="absolute inset-0 opacity-10"
+        style={{ backgroundImage: "radial-gradient(circle at 20% 20%, white 1px, transparent 1px), radial-gradient(circle at 80% 80%, white 1px, transparent 1px)", backgroundSize: "24px 24px" }}
+      />
+      {/* Glow behind icon */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-28 h-28 rounded-full" style={{ background: config.accent, opacity: 0.12, filter: "blur(20px)" }} />
+      </div>
+      {/* Icon */}
+      <div className="relative z-10 drop-shadow-lg">
+        {config.icon}
+      </div>
+      {/* Brand label */}
+      <span className="relative z-10 mt-2 text-[9px] font-black tracking-widest uppercase" style={{ color: config.accent }}>
+        {config.label}
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -143,16 +189,9 @@ export function ProductCard({ product }: ProductCardProps) {
       aria-labelledby={`product-heading-${product.id}`}
     >
       <div>
-        {/* Product Icon Area */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-[#f8fafc] flex items-center justify-center border border-slate-100 group-hover:bg-[#edf1f5] transition-colors">
-          <div className="flex flex-col items-center justify-center gap-1 group-hover:scale-110 transition-transform duration-200">
-            <CategoryIcon slug={categorySlug} className="h-16 w-16" />
-            {product.brand && (
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {product.brand}
-              </span>
-            )}
-          </div>
+        {/* Product Image Area — premium brand-coloured mockup */}
+        <div className="relative aspect-square w-full overflow-hidden rounded-lg group-hover:scale-[1.02] transition-transform duration-300">
+          <CategoryMockup slug={categorySlug} brand={product.brand ?? undefined} className="w-full h-full" />
 
           {/* Badges */}
           <div className="absolute left-2 top-2 flex flex-col gap-1 z-10">

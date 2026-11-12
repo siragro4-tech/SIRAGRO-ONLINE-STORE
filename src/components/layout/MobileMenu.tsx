@@ -138,17 +138,29 @@ export function MobileMenu({ open, onClose, itemCount = 0 }: MobileMenuProps) {
           </nav>
         </div>
 
-        {/* Footer info */}
-        <div className="border-t border-[#414e60] p-4 text-xs space-y-1 bg-[#242c37] text-white/80">
-          <div>📍 147 North Hyde Road, Hayes UB3 4NS</div>
-          <div>📞 020 8813 6458 / 0208 848 4840</div>
-          <div>🕐 Mon–Sun: 7am – 10pm</div>
-          <div className="flex gap-4 pt-2 font-bold text-white">
-            <Link href="/login" onClick={onClose} className="hover:underline">Sign In</Link>
-            <span>•</span>
-            <Link href="/register" onClick={onClose} className="hover:underline">Register</Link>
-            <span>•</span>
-            <Link href="/delivery-info" onClick={onClose} className="hover:underline">Delivery</Link>
+        {/* Footer — Sign In & Register only */}
+        <div className="border-t border-[#414e60] p-4 bg-[#242c37]">
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/login"
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-sm font-black text-white border border-white/30 hover:bg-white/10 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+              Sign In
+            </Link>
+            <Link
+              href="/register"
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-sm font-black text-[#323C4B] bg-white hover:bg-white/90 shadow transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+              </svg>
+              Register
+            </Link>
           </div>
         </div>
       </div>

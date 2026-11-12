@@ -468,6 +468,102 @@ export type Database = {
         };
         Relationships: [];
       };
+      order_status_history: {
+        Row: {
+          id: string;
+          order_id: string;
+          previous_status: string | null;
+          new_status:
+            | "pending"
+            | "processing"
+            | "ready_for_pickup"
+            | "out_for_delivery"
+            | "delivered"
+            | "collected"
+            | "cancelled";
+          changed_by_profile_id: string | null;
+          changed_by_email: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          previous_status?: string | null;
+          new_status:
+            | "pending"
+            | "processing"
+            | "ready_for_pickup"
+            | "out_for_delivery"
+            | "delivered"
+            | "collected"
+            | "cancelled";
+          changed_by_profile_id?: string | null;
+          changed_by_email: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          previous_status?: string | null;
+          new_status?:
+            | "pending"
+            | "processing"
+            | "ready_for_pickup"
+            | "out_for_delivery"
+            | "delivered"
+            | "collected"
+            | "cancelled";
+          changed_by_profile_id?: string | null;
+          changed_by_email?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      order_notifications: {
+        Row: {
+          id: string;
+          order_id: string;
+          recipient_email: string;
+          notification_type: string;
+          status_target: string;
+          send_status: "pending" | "sent" | "failed";
+          attempt_count: number;
+          last_error: string | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          recipient_email: string;
+          notification_type?: string;
+          status_target: string;
+          send_status?: "pending" | "sent" | "failed";
+          attempt_count?: number;
+          last_error?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          recipient_email?: string;
+          notification_type?: string;
+          status_target?: string;
+          send_status?: "pending" | "sent" | "failed";
+          attempt_count?: number;
+          last_error?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -476,6 +572,18 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      get_sales_metrics: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          total_paid_revenue: number;
+          total_paid_orders: number;
+          average_order_value: number;
+          today_paid_revenue: number;
+          today_paid_orders: number;
+          month_paid_revenue: number;
+          month_paid_orders: number;
+        };
       };
     };
     Enums: {

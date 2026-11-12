@@ -130,3 +130,146 @@ export async function sendOrderConfirmationEmail(details: OrderEmailDetails) {
   }
 }
 
+export type StatusUpdateEmailDetails = {
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  fulfilmentType: "delivery" | "collection";
+  newStatus: string;
+  deliveryAddress?: string | null;
+  adminNotes?: string | null;
+};
+
+const STATUS_TITLES: Record<string, { subject: string; heading: string; message: string; badgeColor: string }> = {
+  processing: {
+    subject: "Order In Progress",
+    heading: "Your Order is Being Prepared",
+    message: "Our supermarket team is currently picking and packing your items with care.",
+    badgeColor: "#0284c7",
+  },
+  ready_for_pickup: {
+    subject: "Ready for Collection",
+    heading: "Your Order is Ready for Pickup!",
+    message: "Your grocery order is packed and ready for collection at our store counter: 147 North Hyde Road, Hayes, Middlesex UB3 4NS.",
+    badgeColor: "#16a34a",
+  },
+  out_for_delivery: {
+    subject: "Out for Delivery",
+    heading: "Your Order is on the Way!",
+    message: "Our local delivery driver has your order and is currently heading to your delivery address.",
+    badgeColor: "#0284c7",
+  },
+  delivered: {
+    subject: "Order Delivered",
+    heading: "Your Order Has Been Delivered",
+    message: "Your order has been safely delivered to your address. Thank you for choosing SIRAGRO!",
+    badgeColor: "#16a34a",
+  },
+  collected: {
+    subject: "Order Collected",
+    heading: "Order Collected — Thank You!",
+    message: "Your order has been handed over at our store counter. We appreciate your custom!",
+    badgeColor: "#16a34a",
+  },
+  cancelled: {
+    subject: "Order Update: Cancelled",
+    heading: "Order Cancellation Notice",
+    message: "Your order has been marked as cancelled. If you did not request this or have any queries, please get in touch with our team directly.",
+    badgeColor: "#dc2626",
+  },
+};
+
+/**
+ * Sends a transactional order status update email to the customer.
+ */
+export async function sendStatusUpdateEmail(details: StatusUpdateEmailDetails): Promise<{
+  success: boolean;
+  simulated?: boolean;
+  error?: string;
+}> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const statusConfig = STATUS_TITLES[details.newStatus] || {
+    subject: `Order Status Update: ${details.newStatus}`,
+    heading: `Order Status Update: ${details.newStatus}`,
+    message: `Your order status has been updated to "${details.newStatus}".`,
+    badgeColor: "#323c4b",
+  };
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${statusConfig.subject} - SIRAGRO</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #323C4B; padding: 22px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: bold; letter-spacing: 0.5px;">SIRAGRO SUPERMARKET</h1>
+          <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">147 North Hyde Road, Hayes, UB3 4NS • 020 8813 6458</p>
+        </div>
+
+        <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
+          <p style="font-size: 15px;">Hi <strong>${details.customerName}</strong>,</p>
+          <div style="background-color: #f8fafc; border-left: 4px solid ${statusConfig.badgeColor}; padding: 14px 18px; margin: 18px 0; border-radius: 0 6px 6px 0;">
+            <h2 style="margin: 0 0 6px 0; font-size: 18px; color: #0f172a;">${statusConfig.heading}</h2>
+            <p style="margin: 0; color: #334155; font-size: 14px;">${statusConfig.message}</p>
+          </div>
+
+          <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px; margin: 20px 0; font-size: 13px;">
+            <p style="margin: 0;"><strong>Order Reference:</strong> <span style="font-family: monospace; font-size: 14px; font-weight: bold; color: #323C4B;">${details.orderNumber}</span></p>
+            <p style="margin: 6px 0 0 0;"><strong>Fulfilment Type:</strong> ${details.fulfilmentType === "delivery" ? "Home Delivery" : "In-Store Collection"}</p>
+            ${
+              details.fulfilmentType === "delivery" && details.deliveryAddress
+                ? `<p style="margin: 6px 0 0 0;"><strong>Delivery Address:</strong> ${details.deliveryAddress}</p>`
+                : ""
+            }
+            ${
+              details.fulfilmentType === "collection"
+                ? `<p style="margin: 6px 0 0 0;"><strong>Collection Desk:</strong> 147 North Hyde Road, Hayes, Middlesex UB3 4NS (Daily 7am – 10pm)</p>`
+                : ""
+            }
+            ${
+              details.adminNotes
+                ? `<p style="margin: 10px 0 0 0; padding-top: 8px; border-top: 1px dashed #cbd5e1; color: #475569;"><strong>Store Note:</strong> ${details.adminNotes}</p>`
+                : ""
+            }
+          </div>
+
+          <div style="margin-top: 26px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; text-align: center;">
+            <p style="margin: 2px 0;">SIRAGRO Supermarket &amp; Off-Licence</p>
+            <p style="margin: 2px 0;">Need help? Call <a href="tel:02088136458" style="color: #323C4B; text-decoration: underline;">020 8813 6458</a> or <a href="tel:02088484840" style="color: #323C4B; text-decoration: underline;">0208 848 4840</a></p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  if (!apiKey || apiKey === "re_your-resend-api-key") {
+    console.log(
+      `[DEV EMAIL SIMULATION] Status update email for order ${details.orderNumber} (${details.newStatus}) to ${details.customerEmail}`
+    );
+    return { success: true, simulated: true };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from: "SIRAGRO Orders <orders@siragro.co.uk>",
+      to: [details.customerEmail],
+      subject: `${statusConfig.subject} — Order #${details.orderNumber} (SIRAGRO)`,
+      html: emailHtml,
+    });
+
+    if (error) {
+      console.error("[Resend Status Email Error]:", error);
+      return { success: false, error: typeof error === "object" && "message" in error ? String(error.message) : "Failed to send email via Resend" };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Email exception occurred";
+    console.error("[Email Exception in sendStatusUpdateEmail]:", message);
+    return { success: false, error: message };
+  }
+}
+

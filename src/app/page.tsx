@@ -69,17 +69,15 @@ export default async function HomePage() {
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <Link
                 href="/shop"
-                className="crazy-card shimmer-btn rounded-2xl bg-white text-[#323C4B] hover:bg-white/95 px-8 py-4 text-base font-black shadow-2xl flex items-center gap-2.5 border-2 border-white"
+                className="crazy-card shimmer-btn rounded-2xl bg-white text-[#323C4B] hover:bg-white/95 px-8 py-4 text-base font-black shadow-2xl border-2 border-white"
               >
-                <span className="crazy-icon text-xl">🛒</span>
-                <span>Shop Now</span>
+                Shop Now
               </Link>
               <Link
                 href="#dept-heading"
-                className="crazy-card rounded-2xl bg-[#242c37]/90 hover:bg-[#242c37] border-2 border-white text-white px-7 py-3.5 text-base font-bold shadow-2xl backdrop-blur-sm flex items-center gap-2.5"
+                className="crazy-card rounded-2xl bg-[#242c37]/90 hover:bg-[#242c37] border-2 border-white text-white px-7 py-3.5 text-base font-bold shadow-2xl backdrop-blur-sm"
               >
-                <span className="crazy-icon text-xl">🏬</span>
-                <span>Explore Our Store</span>
+                Explore Our Store
               </Link>
             </div>
 
