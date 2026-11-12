@@ -3,21 +3,28 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { HeaderSearchBar } from "./HeaderSearchBar";
 import { MobileMenu } from "./MobileMenu";
 
-/** Main navigation links shown to all customers. */
-const navLinks = [
-  { href: "/shop", label: "Shop" },
-  { href: "/about", label: "About Us" },
-  { href: "/contact", label: "Contact" },
+/** Supermarket aisle categories shown in the bottom nav strip. */
+const CATEGORIES = [
+  { slug: "fresh-produce",        label: "Fresh Produce",         emoji: "🥦" },
+  { slug: "dairy-eggs",           label: "Dairy & Eggs",          emoji: "🥛" },
+  { slug: "bakery",               label: "Bakery",                emoji: "🍞" },
+  { slug: "meat-fish",            label: "Meat & Fish",           emoji: "🥩" },
+  { slug: "off-licence-beverages",label: "Off-Licence",           emoji: "🍷" },
+  { slug: "cupboard-groceries",   label: "Cupboard & Groceries",  emoji: "🥫" },
+  { slug: "frozen-goods",         label: "Frozen Goods",          emoji: "❄️" },
+  { slug: "household-cleaning",   label: "Household & Cleaning",  emoji: "🧼" },
 ] as const;
 
-/**
- * Site-wide header with responsive navigation.
- *
- * Desktop: horizontal nav bar with links and basket icon.
- * Mobile:  hamburger button that opens a slide-out menu.
- */
+const NAV_LINKS = [
+  { href: "/shop",          label: "Shop All" },
+  { href: "/about",         label: "About Us" },
+  { href: "/contact",       label: "Contact" },
+  { href: "/delivery-info", label: "Delivery" },
+] as const;
+
 interface HeaderProps {
   initialItemCount?: number;
 }
@@ -27,184 +34,185 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
   const itemCount = initialItemCount;
 
   return (
-    <header
-      className="sticky top-0 z-50 border-b shadow-sm"
-      style={{
-        backgroundColor: "var(--color-bg)",
-        borderColor: "var(--color-border)",
-      }}
-    >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Logo / brand */}
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-xl font-bold tracking-tight"
-          style={{ color: "var(--color-primary-dark)" }}
-          aria-label="SIRAGRO home"
-        >
-          <Logo className="h-8 w-8" />
-          <span>SIRAGRO</span>
-        </Link>
+    <header className="sticky top-0 z-50 w-full" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.18)" }}>
 
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-6 md:flex" aria-label="Main navigation">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium transition-colors hover:opacity-80"
-              style={{ color: "var(--color-text)" }}
-            >
-              {link.label}
+      {/* ── Layer 1: Utility bar ─────────────────────────── */}
+      <div
+        className="hidden md:block text-xs"
+        style={{ backgroundColor: "var(--color-brand)", color: "#d1d5db" }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-1.5 sm:px-6 lg:px-8">
+          {/* Left — store info */}
+          <div className="flex items-center gap-5">
+            <span className="flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0 1 15 0Z" />
+              </svg>
+              147 North Hyde Road, Hayes UB3 4NS
+            </span>
+            <span className="flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+              </svg>
+              0208 848 4840
+            </span>
+            <span className="flex items-center gap-1.5">
+              <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+              Mon–Sun: 7am – 10pm
+            </span>
+          </div>
+
+          {/* Right — account links */}
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="hover:text-white transition-colors">Sign In</Link>
+            <span className="text-gray-600">|</span>
+            <Link href="/register" className="hover:text-white transition-colors">Register</Link>
+            <span className="text-gray-600">|</span>
+            <Link href="/delivery-info" className="hover:text-white transition-colors flex items-center gap-1">
+              <svg className="h-3.5 w-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.25V3.75m0 3.75h3.75m-3.75 0h-6.75m6.75 0v3.75m0 0h3.75m-3.75 0h-6.75" />
+              </svg>
+              Delivery Info
             </Link>
-          ))}
-        </nav>
+          </div>
+        </div>
+      </div>
 
-        {/* Desktop right-side actions */}
-        <div className="hidden items-center gap-4 md:flex">
-          {/* Search link */}
+      {/* ── Layer 2: Main header ─────────────────────────── */}
+      <div
+        className="border-b"
+        style={{ backgroundColor: "var(--color-brand)", borderColor: "#2a2a2a" }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+
+          {/* Logo + wordmark */}
           <Link
-            href="/shop"
-            className="rounded-full p-2 transition-colors hover:bg-gray-100"
-            aria-label="Search products"
+            href="/"
+            className="flex flex-shrink-0 items-center gap-3 group"
+            aria-label="SIRAGRO home"
           >
-            <SearchIcon className="h-5 w-5" />
+            <Logo size={52} dark />
+            <div className="hidden sm:block leading-tight">
+              <div className="text-xl font-black tracking-widest text-white uppercase">
+                SIRAGRO
+              </div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "#4ade80" }}>
+                Supermarket &amp; Off-Licence
+              </div>
+            </div>
           </Link>
 
-          {/* Account link */}
+          {/* Search bar — takes remaining width */}
+          <div className="flex-1 min-w-0">
+            <HeaderSearchBar />
+          </div>
+
+          {/* Account icon */}
           <Link
             href="/account"
-            className="rounded-full p-2 transition-colors hover:bg-gray-100"
-            aria-label="Your account"
+            className="hidden md:flex flex-shrink-0 flex-col items-center gap-0.5 rounded-lg p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="My account"
           >
-            <UserIcon className="h-5 w-5" />
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+            <span className="text-[10px] font-semibold">Account</span>
           </Link>
 
-          {/* Basket link with item count badge */}
+          {/* Basket icon with count */}
           <Link
             href="/basket"
-            className="relative rounded-full p-2 transition-colors hover:bg-gray-100"
-            aria-label={`View basket (${itemCount} items)`}
+            className="flex-shrink-0 relative flex flex-col items-center gap-0.5 rounded-lg p-2 text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label={`Shopping basket — ${itemCount} item${itemCount !== 1 ? "s" : ""}`}
           >
-            <BasketIcon className="h-5 w-5" />
-            {itemCount > 0 && (
-              <span
-                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
-                style={{ backgroundColor: "var(--color-primary)" }}
-                aria-hidden="true"
-              >
-                {itemCount}
-              </span>
-            )}
+            <div className="relative">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+              </svg>
+              {itemCount > 0 && (
+                <span
+                  className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black text-white"
+                  style={{ backgroundColor: "var(--color-primary)" }}
+                  aria-hidden="true"
+                >
+                  {itemCount > 99 ? "99+" : itemCount}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] font-semibold">Basket</span>
           </Link>
-        </div>
 
-        {/* Mobile hamburger */}
-        <button
-          type="button"
-          className="rounded-lg p-2 md:hidden"
-          onClick={() => setMobileOpen(true)}
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-menu"
-          aria-label="Open menu"
-        >
-          <HamburgerIcon className="h-6 w-6" />
-        </button>
+          {/* Mobile hamburger */}
+          <button
+            type="button"
+            className="rounded-lg p-2 text-white md:hidden hover:bg-white/10 transition-colors"
+            onClick={() => setMobileOpen(true)}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-menu"
+            aria-label="Open menu"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {/* ── Layer 3: Category navigation strip ───────────── */}
+      <nav
+        className="hidden md:block overflow-x-auto border-b"
+        style={{ backgroundColor: "#1a1a1a", borderColor: "#2a2a2a" }}
+        aria-label="Shop by category"
+      >
+        <div className="mx-auto flex max-w-7xl items-center gap-0 px-4 sm:px-6 lg:px-8">
+          {/* All Departments CTA */}
+          <Link
+            href="/shop"
+            className="flex flex-shrink-0 items-center gap-2 border-r px-4 py-3 text-sm font-bold text-white hover:bg-white/10 transition-colors whitespace-nowrap"
+            style={{ borderColor: "#333" }}
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+            All Departments
+          </Link>
+
+          {/* Category links */}
+          {CATEGORIES.map((cat) => (
+            <Link
+              key={cat.slug}
+              href={`/category/${cat.slug}`}
+              className="flex flex-shrink-0 items-center gap-1.5 px-3.5 py-3 text-xs font-semibold transition-colors whitespace-nowrap hover:bg-white/10"
+              style={{ color: "#d1d5db" }}
+            >
+              <span>{cat.emoji}</span>
+              <span>{cat.label}</span>
+            </Link>
+          ))}
+
+          {/* Off-Licence special link (highlighted) */}
+          <div className="ml-auto flex-shrink-0 px-4 py-2">
+            <Link
+              href="/category/off-licence-beverages"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold text-white transition-colors"
+              style={{ backgroundColor: "var(--color-off-licence)" }}
+            >
+              🍷 Off-Licence
+            </Link>
+          </div>
+        </div>
+      </nav>
 
       {/* Mobile slide-out menu */}
       <MobileMenu
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        links={navLinks}
+        links={NAV_LINKS}
         itemCount={itemCount}
       />
     </header>
   );
 }
-
-/* ---------------------------------------------------------------
- * Inline SVG icon components
- * (Small, self-contained — no icon library needed yet.)
- * --------------------------------------------------------------- */
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-      />
-    </svg>
-  );
-}
-
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"
-      />
-    </svg>
-  );
-}
-
-function BasketIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"
-      />
-    </svg>
-  );
-}
-
-function HamburgerIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-      />
-    </svg>
-  );
-}
-

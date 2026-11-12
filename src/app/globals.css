@@ -1,38 +1,54 @@
 @import "tailwindcss";
 
 /*
- * SIRAGRO brand tokens
- * ─────────────────────
- * These CSS custom properties define the store's colour palette.
- * Change them here to re-brand the entire site in one place.
+ * SIRAGRO Brand Design Tokens
+ * ─────────────────────────────────────────────────
+ * Colour palette derived from the SIRAGRO circular
+ * black-and-white badge logo.
+ *
+ * Brand identity: Bold Black + Fresh Green + Warm Amber
+ * Inspired by premium local supermarket / off-licence aesthetic.
  */
 :root {
-  /* Primary – deep green (fresh produce / grocery feel) */
+  /* ── Core Brand ── */
+  --color-brand: #111111;           /* Rich black — logo, header, footer */
+  --color-brand-hover: #2a2a2a;
+
+  /* ── Action / Fresh Green — primary CTA colour ── */
   --color-primary: #16a34a;
   --color-primary-dark: #15803d;
-  --color-primary-light: #bbf7d0;
+  --color-primary-light: #dcfce7;
 
-  /* Accent – warm amber (warmth, local shop character) */
-  --color-accent: #f59e0b;
-  --color-accent-dark: #d97706;
+  /* ── Deals & Promotions — warm amber ── */
+  --color-gold: #d97706;
+  --color-gold-light: #fef3c7;
 
-  /* Neutrals */
+  /* ── Off-Licence / Age Restricted — deep red ── */
+  --color-off-licence: #991b1b;
+  --color-off-licence-light: #fee2e2;
+
+  /* ── Neutrals ── */
   --color-bg: #ffffff;
-  --color-bg-muted: #f9fafb;
+  --color-bg-muted: #f8f9fa;
+  --color-bg-dark: #111111;
   --color-text: #111827;
   --color-text-muted: #6b7280;
+  --color-text-inverse: #ffffff;
   --color-border: #e5e7eb;
+  --color-border-dark: #374151;
 
-  /* Danger / error */
+  /* ── Utility ── */
   --color-danger: #dc2626;
-
-  /* Focus ring — accessibility */
   --color-focus: #2563eb;
+
+  /* ── Shadows ── */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+  --shadow-card-hover: 0 4px 12px 0 rgb(0 0 0 / 0.12);
 }
 
-/*
- * Global resets & base styles
- */
+/* ───────────────────────────────────────
+   Global resets & base
+─────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -54,10 +70,9 @@ body {
   line-height: 1.6;
 }
 
-/*
- * Accessible focus styles — visible outline for keyboard users,
- * hidden for mouse users via :focus-visible.
- */
+/* ───────────────────────────────────────
+   Accessible focus styles
+─────────────────────────────────────── */
 :focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
@@ -68,14 +83,14 @@ body {
   outline: none;
 }
 
-/*
- * Skip-to-content link (screen reader + keyboard accessible)
- */
+/* ───────────────────────────────────────
+   Skip-to-content (accessibility)
+─────────────────────────────────────── */
 .skip-link {
   position: absolute;
   top: -100%;
   left: 1rem;
-  z-index: 100;
+  z-index: 200;
   padding: 0.75rem 1.5rem;
   background: var(--color-primary);
   color: #fff;
@@ -89,3 +104,33 @@ body {
   top: 0;
 }
 
+/* ───────────────────────────────────────
+   Horizontal scroll utility (product carousels)
+─────────────────────────────────────── */
+.scroll-row {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.5rem;
+}
+
+.scroll-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.scroll-row::-webkit-scrollbar-track {
+  background: var(--color-bg-muted);
+  border-radius: 2px;
+}
+
+.scroll-row::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+.scroll-row > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
