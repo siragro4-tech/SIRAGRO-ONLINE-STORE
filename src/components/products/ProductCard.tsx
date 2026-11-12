@@ -139,16 +139,16 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <article
-      className="group relative flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-4 transition-all hover:border-green-300 hover:shadow-md focus-within:ring-2 focus-within:ring-green-600"
+      className="group relative flex flex-col justify-between rounded-xl border-2 border-slate-200 bg-white p-4 transition-all hover:border-[#323C4B] hover:shadow-lg focus-within:ring-2 focus-within:ring-[#323C4B]"
       aria-labelledby={`product-heading-${product.id}`}
     >
       <div>
         {/* Product Icon Area */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center border border-gray-100 group-hover:from-green-50 group-hover:to-emerald-50 transition-colors">
+        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-[#f8fafc] flex items-center justify-center border border-slate-100 group-hover:bg-[#edf1f5] transition-colors">
           <div className="flex flex-col items-center justify-center gap-1 group-hover:scale-110 transition-transform duration-200">
             <CategoryIcon slug={categorySlug} className="h-16 w-16" />
             {product.brand && (
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 {product.brand}
               </span>
             )}
@@ -157,7 +157,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {/* Badges */}
           <div className="absolute left-2 top-2 flex flex-col gap-1 z-10">
             {isDiscounted && (
-              <span className="inline-flex items-center rounded-md bg-amber-500 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
+              <span className="inline-flex items-center rounded-md bg-[#323C4B] text-white px-2 py-0.5 text-xs font-black shadow-sm">
                 Save £{(product.compare_at_price! - product.price).toFixed(2)}
               </span>
             )}
@@ -173,8 +173,8 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {/* Out of stock overlay */}
           {isOutOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]">
-              <span className="rounded-md bg-gray-800/80 px-3 py-1 text-xs font-bold text-white">
+            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/80 backdrop-blur-[1px]">
+              <span className="rounded-md bg-[#323C4B] px-3 py-1 text-xs font-bold text-white">
                 Out of Stock
               </span>
             </div>
@@ -184,14 +184,14 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Product Details */}
         <div className="mt-3">
           {product.category && (
-            <p className="text-xs font-medium text-green-700">
+            <p className="text-xs font-bold text-[#323C4B]">
               {product.category.name}
             </p>
           )}
 
           <h3
             id={`product-heading-${product.id}`}
-            className="mt-1 text-sm font-semibold text-gray-900 group-hover:text-green-700 transition-colors line-clamp-2"
+            className="mt-1 text-sm font-bold text-slate-800 group-hover:text-[#323C4B] transition-colors line-clamp-2"
           >
             <Link
               href={`/product/${product.slug}`}
@@ -202,39 +202,38 @@ export function ProductCard({ product }: ProductCardProps) {
           </h3>
 
           {product.unit && (
-            <p className="mt-1 text-xs text-gray-500">{product.unit}</p>
+            <p className="mt-1 text-xs text-slate-500">{product.unit}</p>
           )}
         </div>
       </div>
 
       {/* Pricing & CTA */}
-      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between z-10 relative">
+      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between z-10 relative">
         <div>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-lg font-bold text-gray-900">
+            <span className="text-lg font-black text-[#323C4B]">
               £{product.price.toFixed(2)}
             </span>
             {isDiscounted && (
-              <span className="text-xs text-gray-400 line-through">
+              <span className="text-xs text-slate-400 line-through">
                 £{product.compare_at_price!.toFixed(2)}
               </span>
             )}
           </div>
-          <p className="text-[11px] text-gray-500">
+          <p className="text-[11px] text-slate-500">
             {isOutOfStock ? (
               <span className="text-red-600 font-semibold">Out of stock</span>
             ) : product.stock_quantity < 5 ? (
               <span className="text-amber-600 font-medium">Only {product.stock_quantity} left</span>
             ) : (
-              <span className="text-green-600">In stock</span>
+              <span className="text-emerald-700 font-semibold">In stock</span>
             )}
           </p>
         </div>
 
         <Link
           href={`/product/${product.slug}`}
-          className="relative z-10 inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 hover:scale-105 active:scale-95"
-          style={{ backgroundColor: "var(--color-primary)" }}
+          className="relative z-10 inline-flex items-center gap-1 rounded-lg px-3.5 py-1.5 text-xs font-bold text-white bg-[#323C4B] hover:bg-[#242c37] shadow-sm transition-all hover:scale-105 active:scale-95"
           aria-label={`View ${product.name}`}
         >
           View

@@ -1,59 +1,45 @@
 @import "tailwindcss";
 
 /*
- * SIRAGRO Storefront Brand Design Tokens
+ * SIRAGRO Brand Design Tokens
  * ─────────────────────────────────────────────────
- * Sampled directly from the real physical storefront fascia board
- * at 147 North Hyde Road (Hayes, UB3 4NS):
- *
- * Fascia: Deep Slate Navy (#1c2633 / #222f3e)
- * Lettering: 3D Embossed Crisp White (#ffffff)
- * Awning & Window livery: Deep Charcoal Black (#111827)
- * High-street accents:
- *   - Fresh Produce Green (#16a34a)
- *   - PayPoint / Deal Gold (#eab308 / #f59e0b)
- *   - Licensed Off-Licence Ruby (#dc2626 / #991b1b)
+ * Primary Brand: #323C4B (Storefront Signboard Slate)
+ * Accent: Pure White (#ffffff)
  */
 :root {
-  /* ── Storefront Fascia (exact colour from physical signboard) ── */
-  --color-fascia: #1e293b;          /* Dark slate navy fascia */
-  --color-fascia-dark: #0f172a;     /* Deep navy night */
-  --color-fascia-light: #334155;    /* Slate accent */
-  --color-brand: #1e293b;
-  --color-brand-hover: #334155;
+  /* ── Core Brand (#323C4B) ── */
+  --color-brand: #323C4B;
+  --color-brand-dark: #242c37;
+  --color-brand-darker: #1b2129;
+  --color-brand-light: #414e60;
+  --color-brand-lighter: #54647b;
+  --color-brand-tint: #f1f4f8;
+  --color-brand-muted: #e4e9f0;
 
-  /* ── Accent colours ── */
-  --color-primary: #16a34a;         /* Fresh produce green */
-  --color-primary-dark: #15803d;
-  --color-primary-bright: #22c55e;
-  --color-primary-light: #dcfce7;
-
-  /* ── Commercial High-Street Accents ── */
-  --color-gold: #f59e0b;            /* PayPoint / Deals warm gold */
-  --color-gold-dark: #d97706;
-  --color-gold-light: #fef3c7;
-
-  --color-off-licence: #dc2626;     /* Off-licence red */
-  --color-off-licence-dark: #991b1b;
-  --color-off-licence-light: #fee2e2;
+  /* ── Accents ── */
+  --color-primary: #323C4B;
+  --color-primary-hover: #242c37;
+  --color-accent-green: #15803d;
+  --color-accent-gold: #d97706;
+  --color-accent-red: #b91c1c;
 
   /* ── Neutrals ── */
   --color-bg: #ffffff;
-  --color-bg-muted: #f8fafc;        /* Crisp slate tint */
-  --color-bg-dark: #1e293b;
-  --color-text: #0f172a;
+  --color-bg-muted: #f4f6f9;
+  --color-bg-brand: #323C4B;
+  --color-text: #1e2530;
   --color-text-muted: #64748b;
   --color-text-inverse: #ffffff;
-  --color-border: #e2e8f0;
-  --color-border-dark: #334155;
+  --color-border: #cbd5e1;
+  --color-border-dark: #475569;
 
-  /* ── Focus & Interactive ── */
-  --color-focus: #2563eb;
+  /* ── Interactive ── */
+  --color-focus: #323C4B;
 
   /* ── Shadows ── */
-  --shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.08);
-  --shadow-card-hover: 0 10px 25px -3px rgb(15 23 42 / 0.12);
-  --shadow-fascia: 0 4px 20px -2px rgb(15 23 42 / 0.35);
+  --shadow-card: 0 2px 8px 0 rgb(50 60 75 / 0.10);
+  --shadow-card-hover: 0 10px 25px -3px rgb(50 60 75 / 0.20);
+  --shadow-brand: 0 4px 20px -2px rgb(50 60 75 / 0.35);
 }
 
 *,
@@ -78,7 +64,7 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-focus);
+  outline: 3px solid var(--color-brand);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -93,7 +79,7 @@ body {
   left: 1rem;
   z-index: 200;
   padding: 0.75rem 1.5rem;
-  background: var(--color-primary);
+  background: var(--color-brand);
   color: #fff;
   font-weight: 600;
   border-radius: 0 0 0.5rem 0.5rem;
@@ -112,17 +98,18 @@ body {
 }
 .scroll-row::-webkit-scrollbar { height: 4px; }
 .scroll-row::-webkit-scrollbar-track { background: var(--color-bg-muted); border-radius: 2px; }
-.scroll-row::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 2px; }
+.scroll-row::-webkit-scrollbar-thumb { background: #323C4B; border-radius: 2px; }
 .scroll-row > * { scroll-snap-align: start; flex-shrink: 0; }
 
-/* 3D embossed text effect matching the signboard letters */
+/* 3D embossed text effect matching the physical signboard */
 .fascia-3d-text {
   font-weight: 900;
   letter-spacing: 0.08em;
   color: #ffffff;
   text-shadow:
-    0 1px 0 #cbd5e1,
-    0 2px 0 #94a3b8,
-    0 3px 0 #64748b,
-    0 5px 12px rgba(0, 0, 0, 0.45);
+    0 1px 0 #94a3b8,
+    0 2px 0 #64748b,
+    0 3px 0 #475569,
+    0 4px 0 #334155,
+    0 6px 14px rgba(27, 33, 41, 0.6);
 }

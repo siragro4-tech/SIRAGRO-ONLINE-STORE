@@ -3,10 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-/**
- * Header search bar — client component so it can read/set the query
- * and navigate to /shop?q=... on submit.
- */
 export function HeaderSearchBar() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -21,21 +17,20 @@ export function HeaderSearchBar() {
     <form
       onSubmit={handleSubmit}
       role="search"
-      className="flex w-full items-center overflow-hidden rounded-lg border-2 border-transparent bg-white shadow-sm transition-all focus-within:border-green-500"
+      className="flex w-full items-center overflow-hidden rounded-lg bg-white shadow-sm border border-slate-300 focus-within:border-white focus-within:ring-2 focus-within:ring-white"
     >
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search for groceries, drinks, essentials…"
+        placeholder="Search groceries, drinks, fresh fruit, vegetables, frozen foods…"
         aria-label="Search SIRAGRO products"
-        className="flex-1 bg-transparent px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+        className="flex-1 bg-transparent px-4 py-2.5 text-sm text-[#323C4B] placeholder:text-slate-400 focus:outline-none"
       />
       <button
         type="submit"
         aria-label="Submit search"
-        className="flex h-full items-center gap-1.5 px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90"
-        style={{ backgroundColor: "var(--color-primary)" }}
+        className="flex h-full items-center gap-1.5 px-5 py-2.5 text-sm font-bold bg-[#323C4B] text-white hover:bg-[#242c37] transition-colors"
       >
         <svg
           className="h-4 w-4"
@@ -56,4 +51,3 @@ export function HeaderSearchBar() {
     </form>
   );
 }
-

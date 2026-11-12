@@ -5,45 +5,45 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-[#0f172a] text-slate-300 border-t border-slate-800" aria-labelledby="footer-heading">
+    <footer className="bg-[#242c37] text-white border-t-4 border-[#323C4B]" aria-labelledby="footer-heading">
       <h2 id="footer-heading" className="sr-only">SIRAGRO Footer</h2>
 
-      {/* ── Main footer grid ── */}
+      {/* Main footer grid */}
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5">
 
           {/* Col 1 — Brand (wider) */}
           <div className="lg:col-span-2">
-            <Link href="/" className="flex items-center gap-3 group">
+            <Link href="/" className="flex items-center gap-3.5 group">
               <Logo size={56} dark />
               <div className="text-white leading-tight">
-                <div className="text-xl font-black tracking-widest uppercase">SIRAGRO</div>
-                <div className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#4ade80" }}>
+                <div className="text-2xl font-black tracking-wider uppercase">SIRAGRO</div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/80">
                   Supermarket &amp; Off-Licence
                 </div>
               </div>
             </Link>
 
-            <p className="mt-5 text-sm leading-relaxed text-slate-400">
+            <p className="mt-4 text-sm leading-relaxed text-white/80">
               Your trusted local supermarket and licensed off-licence at 147 North Hyde Road, Hayes.
               Serving the UB3 community with fresh groceries, chilled drinks, bakery goods
               and in-store counter services.
             </p>
 
             {/* Contact info */}
-            <div className="mt-5 space-y-2 text-sm text-slate-300">
+            <div className="mt-5 space-y-2 text-sm text-white/90">
               <div className="flex items-start gap-2">
-                <span className="text-emerald-400 mt-0.5">📍</span>
+                <span className="mt-0.5">📍</span>
                 <span>147 North Hyde Road, Hayes,<br />Middlesex UB3 4NS</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-emerald-400">📞</span>
-                <a href="tel:02088136458" className="hover:text-white transition-colors">020 8813 6458</a>
-                <span className="text-slate-600">/</span>
-                <a href="tel:02088484840" className="hover:text-white transition-colors">0208 848 4840</a>
+                <span>📞</span>
+                <a href="tel:02088136458" className="hover:text-white font-bold transition-colors">020 8813 6458</a>
+                <span className="text-white/40">/</span>
+                <a href="tel:02088484840" className="hover:text-white font-bold transition-colors">0208 848 4840</a>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-emerald-400">🕐</span>
+                <span>🕐</span>
                 Monday – Sunday: 7:00am – 10:00pm
               </div>
             </div>
@@ -53,8 +53,7 @@ export function Footer() {
               {["PayPoint", "National Lottery", "Ria Money Transfer", "KeyNest", "Phone Repair"].map((s) => (
                 <span
                   key={s}
-                  className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                  style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}
+                  className="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-[#323C4B] text-white border border-[#4a586d]"
                 >
                   {s}
                 </span>
@@ -62,125 +61,58 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Col 2 — Shop aisles */}
+          {/* Col 2 — Shop Aisles */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">
-              Shop Aisles
-            </h3>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                { href: "/shop",                        label: "All Products" },
-                { href: "/category/fresh-produce",      label: "🥦 Fresh Produce" },
-                { href: "/category/dairy-eggs",         label: "🥛 Dairy & Eggs" },
-                { href: "/category/bakery",             label: "🍞 Bakery" },
-                { href: "/category/meat-fish",          label: "🥩 Meat & Fish" },
-                { href: "/category/off-licence-beverages", label: "🍷 Off-Licence" },
-                { href: "/category/cupboard-groceries", label: "🥫 Cupboard & Groceries" },
-                { href: "/category/frozen-goods",       label: "❄️ Frozen Goods" },
-                { href: "/category/household-cleaning", label: "🧼 Household & Cleaning" },
-              ].map(({ href, label }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-sm transition-colors hover:text-white"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
+            <h3 className="text-sm font-black tracking-wider text-white uppercase">Shop Aisles</h3>
+            <ul className="mt-4 space-y-2.5 text-xs text-white/80">
+              <li><Link href="/category/fresh-produce" className="hover:text-white transition-colors">Fresh Fruits &amp; Veg</Link></li>
+              <li><Link href="/category/dairy-eggs" className="hover:text-white transition-colors">Dairy &amp; Eggs</Link></li>
+              <li><Link href="/category/bakery" className="hover:text-white transition-colors">Fresh Bakery</Link></li>
+              <li><Link href="/category/meat-fish" className="hover:text-white transition-colors">Meat &amp; Fish</Link></li>
+              <li><Link href="/category/off-licence-beverages" className="hover:text-white transition-colors font-bold text-white">Off-Licence &amp; Beers</Link></li>
+              <li><Link href="/category/cupboard-groceries" className="hover:text-white transition-colors">Cupboard Groceries</Link></li>
+              <li><Link href="/category/frozen-goods" className="hover:text-white transition-colors">Frozen Foods</Link></li>
+              <li><Link href="/category/household-cleaning" className="hover:text-white transition-colors">Household Essentials</Link></li>
             </ul>
           </div>
 
-          {/* Col 3 — Help & Info */}
+          {/* Col 3 — Customer Care */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">
-              Help &amp; Info
-            </h3>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                { href: "/about",         label: "About SIRAGRO" },
-                { href: "/contact",       label: "Contact Us" },
-                { href: "/delivery-info", label: "Delivery Information" },
-                { href: "/account",       label: "My Account" },
-                { href: "/account/orders/", label: "Order History" },
-                { href: "/login",         label: "Sign In" },
-                { href: "/register",      label: "Register" },
-              ].map(({ href, label }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-sm transition-colors hover:text-white"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
+            <h3 className="text-sm font-black tracking-wider text-white uppercase">Customer Care</h3>
+            <ul className="mt-4 space-y-2.5 text-xs text-white/80">
+              <li><Link href="/delivery-info" className="hover:text-white transition-colors">Delivery Information</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact Us &amp; Map</Link></li>
+              <li><Link href="/about" className="hover:text-white transition-colors">About SIRAGRO</Link></li>
+              <li><Link href="/account" className="hover:text-white transition-colors">My Account</Link></li>
+              <li><Link href="/basket" className="hover:text-white transition-colors">Shopping Basket</Link></li>
+              <li><Link href="/admin" className="hover:text-white transition-colors text-white/60">Staff Admin Portal</Link></li>
             </ul>
           </div>
 
-          {/* Col 4 — Legal */}
+          {/* Col 4 — Legal & Licencing */}
           <div>
-            <h3 className="text-xs font-black uppercase tracking-widest text-white">
-              Legal
-            </h3>
-            <ul className="mt-4 space-y-2.5">
-              {[
-                { href: "/privacy",  label: "Privacy Policy" },
-                { href: "/terms",    label: "Terms & Conditions" },
-                { href: "/cookies",  label: "Cookie Policy" },
-              ].map(({ href, label }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className="text-sm transition-colors hover:text-white"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
+            <h3 className="text-sm font-black tracking-wider text-white uppercase">Legal &amp; Store</h3>
+            <ul className="mt-4 space-y-2.5 text-xs text-white/80">
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms &amp; Conditions</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/cookies" className="hover:text-white transition-colors">Cookie Preferences</Link></li>
             </ul>
 
-            <div className="mt-8">
-              <h3 className="text-xs font-black uppercase tracking-widest text-white">
-                Responsible Retail
-              </h3>
-              <div
-                className="mt-3 rounded-xl p-3 text-xs leading-relaxed"
-                style={{ backgroundColor: "rgba(185,28,28,0.15)", border: "1px solid rgba(185,28,28,0.3)", color: "#fca5a5" }}
-              >
-                <span className="font-black text-red-400">Challenge 25:</span> We operate
-                a strict Challenge 25 policy on all off-licence purchases.
-                Photo ID required for anyone who appears under 25.
-                Licensing Act 2003.
-              </div>
+            <div className="mt-6 rounded-xl bg-[#323C4B] p-3.5 border border-[#4a586d]">
+              <p className="text-[11px] font-bold text-white uppercase tracking-wider">Challenge 25</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-white/80">
+                Under the Licensing Act 2003, it is an offence to sell alcohol to anyone under 18. Valid photo ID required.
+              </p>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* ── Bottom bar ── */}
-      <div
-        className="border-t"
-        style={{ borderColor: "#2a2a2a", backgroundColor: "#080808" }}
-      >
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-          <p className="text-xs" style={{ color: "#6b7280" }}>
-            &copy; {currentYear} SIRAGRO Supermarket &amp; Off-Licence. All rights reserved.
-            Registered in England &amp; Wales. 147 North Hyde Road, Hayes UB3 4NS.
-          </p>
-          <div className="flex items-center gap-4">
-            <span className="text-xs" style={{ color: "#6b7280" }}>
-              Secure payments by
-            </span>
-            <span
-              className="rounded px-2 py-0.5 text-xs font-black text-white"
-              style={{ backgroundColor: "#635bff" }}
-            >
-              Stripe
-            </span>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="mt-12 border-t border-[#3d495b] pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/70">
+          <p>© {currentYear} SIRAGRO. 147 North Hyde Road, Hayes, Middlesex UB3 4NS. All rights reserved.</p>
+          <div className="flex items-center gap-3">
+            <span>🔒 Secure checkout powered by Stripe</span>
           </div>
         </div>
       </div>
