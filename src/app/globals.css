@@ -101,7 +101,7 @@ body {
 }
 
 /* ───────────────────────────────────────
-   Continuous Slow Horizontal Marquee
+   Continuous Slow Horizontal Marquee (Left & Right)
 ─────────────────────────────────────── */
 @keyframes marqueeSlow {
   0% {
@@ -109,6 +109,15 @@ body {
   }
   100% {
     transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes marqueeSlowRight {
+  0% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -120,7 +129,8 @@ body {
   position: relative;
 }
 
-.marquee-container:hover .marquee-content {
+.marquee-container:hover .marquee-content,
+.marquee-container:hover .marquee-content-right {
   animation-play-state: paused;
 }
 
@@ -129,6 +139,14 @@ body {
   flex-shrink: 0;
   min-width: 100%;
   animation: marqueeSlow 35s linear infinite;
+  will-change: transform;
+}
+
+.marquee-content-right {
+  display: flex;
+  flex-shrink: 0;
+  min-width: 100%;
+  animation: marqueeSlowRight 42s linear infinite;
   will-change: transform;
 }
 

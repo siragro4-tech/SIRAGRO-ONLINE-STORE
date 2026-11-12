@@ -61,7 +61,7 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
       {/* ── Layer 1: Top Utility Bar (Slow Horizontally Moving Marquee Ticker) ── */}
       <div className="bg-[#242c37] text-white/90 text-xs border-b border-[#3d495b] overflow-hidden flex items-center py-2">
         <div className="marquee-container flex-1">
-          <div className="marquee-content flex items-center gap-12 font-medium">
+          <div className="marquee-content-right flex items-center gap-12 font-medium">
             {/* Set 1 */}
             <span className="flex items-center gap-1.5 whitespace-nowrap">
               <span>📍</span>
