@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { getBasket } from "@/lib/basket";
 
 export const metadata: Metadata = {
   title: {
@@ -18,11 +19,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let basketCount = 0;
+  try {
+    const summary = await getBasket();
+    basketCount = summary.itemCount;
+  } catch {
+    // Fallback gracefully
+  }
+
   return (
     <html lang="en-GB">
       <body className="flex min-h-screen flex-col">
@@ -31,7 +40,7 @@ export default function RootLayout({
           Skip to main content
         </a>
 
-        <Header />
+        <Header initialItemCount={basketCount} />
 
         <main id="main-content" className="flex-1">
           {children}

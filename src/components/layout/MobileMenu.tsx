@@ -7,6 +7,7 @@ interface MobileMenuProps {
   open: boolean;
   onClose: () => void;
   links: ReadonlyArray<{ href: string; label: string }>;
+  itemCount?: number;
 }
 
 /**
@@ -18,7 +19,7 @@ interface MobileMenuProps {
  * - Announces itself as a dialog.
  * - Returns focus to the hamburger button on close.
  */
-export function MobileMenu({ open, onClose, links }: MobileMenuProps) {
+export function MobileMenu({ open, onClose, links, itemCount = 0 }: MobileMenuProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -142,7 +143,7 @@ export function MobileMenu({ open, onClose, links }: MobileMenuProps) {
                 className="block rounded-lg px-4 py-3 text-base font-medium transition-colors hover:bg-gray-100"
                 onClick={onClose}
               >
-                Basket (0)
+                Basket ({itemCount})
               </Link>
             </li>
           </ul>

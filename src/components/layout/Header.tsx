@@ -18,8 +18,13 @@ const navLinks = [
  * Desktop: horizontal nav bar with links and basket icon.
  * Mobile:  hamburger button that opens a slide-out menu.
  */
-export function Header() {
+interface HeaderProps {
+  initialItemCount?: number;
+}
+
+export function Header({ initialItemCount = 0 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const itemCount = initialItemCount;
 
   return (
     <header
@@ -79,17 +84,18 @@ export function Header() {
           <Link
             href="/basket"
             className="relative rounded-full p-2 transition-colors hover:bg-gray-100"
-            aria-label="View basket (0 items)"
+            aria-label={`View basket (${itemCount} items)`}
           >
             <BasketIcon className="h-5 w-5" />
-            {/* Badge — hidden when basket is empty */}
-            <span
-              className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white"
-              style={{ backgroundColor: "var(--color-primary)" }}
-              aria-hidden="true"
-            >
-              0
-            </span>
+            {itemCount > 0 && (
+              <span
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
+                style={{ backgroundColor: "var(--color-primary)" }}
+                aria-hidden="true"
+              >
+                {itemCount}
+              </span>
+            )}
           </Link>
         </div>
 
@@ -111,6 +117,7 @@ export function Header() {
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
         links={navLinks}
+        itemCount={itemCount}
       />
     </header>
   );
