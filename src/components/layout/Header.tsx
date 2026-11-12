@@ -57,14 +57,14 @@ export function Header() {
 
         {/* Desktop right-side actions */}
         <div className="hidden items-center gap-4 md:flex">
-          {/* Search button — placeholder, will be functional in Stage 4 */}
-          <button
-            type="button"
+          {/* Search link */}
+          <Link
+            href="/shop"
             className="rounded-full p-2 transition-colors hover:bg-gray-100"
             aria-label="Search products"
           >
             <SearchIcon className="h-5 w-5" />
-          </button>
+          </Link>
 
           {/* Account link */}
           <Link
