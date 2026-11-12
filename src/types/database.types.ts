@@ -40,6 +40,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       addresses: {
         Row: {
@@ -81,6 +82,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       categories: {
         Row: {
@@ -119,6 +121,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       products: {
         Row: {
@@ -184,6 +187,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       product_images: {
         Row: {
@@ -213,6 +217,7 @@ export type Database = {
           is_primary?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
       baskets: {
         Row: {
@@ -236,6 +241,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       basket_items: {
         Row: {
@@ -262,6 +268,7 @@ export type Database = {
           added_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       orders: {
         Row: {
@@ -348,6 +355,7 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: [];
       };
       order_items: {
         Row: {
@@ -377,6 +385,7 @@ export type Database = {
           quantity?: number;
           line_total?: number;
         };
+        Relationships: [];
       };
       delivery_settings: {
         Row: {
@@ -424,6 +433,7 @@ export type Database = {
           notes?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       age_verification_log: {
         Row: {
@@ -456,7 +466,24 @@ export type Database = {
           notes?: string | null;
           verified_at?: string;
         };
+        Relationships: [];
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      is_admin: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 };
+
