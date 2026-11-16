@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAction } from "@/app/auth/actions";
+import { PasswordInput } from "./PasswordInput";
 
 export function RegisterForm() {
   const [state, formAction, isPending] = useActionState(registerAction, null);
@@ -122,14 +123,12 @@ export function RegisterForm() {
           Password <span className="text-gray-400 text-xs">(min 8 characters)</span>
         </label>
         <div className="mt-1">
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B] sm:text-sm"
           />
         </div>
       </div>
@@ -142,14 +141,12 @@ export function RegisterForm() {
           Confirm password
         </label>
         <div className="mt-1">
-          <input
+          <PasswordInput
             id="confirmPassword"
             name="confirmPassword"
-            type="password"
             autoComplete="new-password"
             required
             minLength={8}
-            className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B] sm:text-sm"
           />
         </div>
       </div>
