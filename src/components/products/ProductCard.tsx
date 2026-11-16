@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Product } from "@/lib/products";
+import { QuickAddOverlay } from "./QuickAddOverlay";
 
 interface ProductCardProps {
   product: Product;
@@ -209,6 +210,13 @@ export function ProductCard({ product }: ProductCardProps) {
               </span>
             )}
           </div>
+
+          {/* Hover Add-to-Cart Overlay */}
+          <QuickAddOverlay
+            productId={product.id}
+            productName={product.name}
+            isOutOfStock={isOutOfStock}
+          />
 
           {/* Out of stock overlay */}
           {isOutOfStock && (
