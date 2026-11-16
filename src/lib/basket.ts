@@ -49,6 +49,49 @@ async function setGuestCookieItems(items: { productId: string; quantity: number 
   });
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves product details from Supabase by UUID, falling back to static products.
+ */
+async function resolveProductsForBasket(
+  productIds: string[]
+): Promise<Map<string, Product>> {
+  const productMap = new Map<string, Product>();
+  const uniqueIds = Array.from(new Set(productIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return productMap;
+
+  const validUuids = uniqueIds.filter((id) => UUID_REGEX.test(id));
+  if (validUuids.length > 0) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*, category:categories(*), images:product_images(*)")
+        .in("id", validUuids);
+
+      if (!error && data) {
+        for (const prod of data as unknown as Product[]) {
+          productMap.set(prod.id, prod);
+        }
+      }
+    } catch {
+      // Database offline or unconfigured: fall back to static products below
+    }
+  }
+
+  for (const id of uniqueIds) {
+    if (!productMap.has(id)) {
+      const fallback = FALLBACK_PRODUCTS.find((p) => p.id === id || p.slug === id);
+      if (fallback) {
+        productMap.set(id, fallback);
+      }
+    }
+  }
+
+  return productMap;
+}
+
 /**
  * Retrieves the full current basket with fresh product details,
  * verified server-side prices, and stock limits.
@@ -93,6 +136,7 @@ export async function getBasket(): Promise<BasketSummary> {
   }
 
   // Populate product details & compute trusted line totals
+  const productMap = await resolveProductsForBasket(rawItems.map((r) => r.productId));
   const items: BasketItem[] = [];
   let subtotal = 0;
   let itemCount = 0;
@@ -101,8 +145,7 @@ export async function getBasket(): Promise<BasketSummary> {
   for (const raw of rawItems) {
     if (raw.quantity <= 0) continue;
 
-    // Find product from static list or database
-    const product = FALLBACK_PRODUCTS.find((p) => p.id === raw.productId || p.slug === raw.productId);
+    const product = productMap.get(raw.productId);
     if (!product || !product.is_available) continue;
 
     // Clamp quantity to available stock
@@ -244,11 +287,14 @@ export async function updateBasketQuantity(productId: string, quantity: number):
         } else {
           await supabase
             .from("basket_items")
-            .upsert({
-              basket_id: basket.id,
-              product_id: productId,
-              quantity,
-            });
+            .upsert(
+              {
+                basket_id: basket.id,
+                product_id: productId,
+                quantity,
+              },
+              { onConflict: "basket_id,product_id" }
+            );
         }
       }
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/products";
 import { addBasketItemAction } from "@/app/basket/actions";
 
@@ -9,6 +10,7 @@ interface AddToBasketSectionProps {
 }
 
 export function AddToBasketSection({ product }: AddToBasketSectionProps) {
+  const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -19,6 +21,7 @@ export function AddToBasketSection({ product }: AddToBasketSectionProps) {
     startTransition(async () => {
       await addBasketItemAction(product.id, quantity);
       setAdded(true);
+      router.refresh();
       setTimeout(() => setAdded(false), 2500);
     });
   }
