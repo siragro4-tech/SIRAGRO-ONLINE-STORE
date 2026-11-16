@@ -387,6 +387,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      contact_messages: {
+        Row: {
+          id: string;
+          name: string;
+          phone: string | null;
+          email: string;
+          subject: string;
+          message: string;
+          status: "new" | "read" | "replied";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          phone?: string | null;
+          email: string;
+          subject: string;
+          message: string;
+          status?: "new" | "read" | "replied";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          phone?: string | null;
+          email?: string;
+          subject?: string;
+          message?: string;
+          status?: "new" | "read" | "replied";
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       delivery_settings: {
         Row: {
           id: string;

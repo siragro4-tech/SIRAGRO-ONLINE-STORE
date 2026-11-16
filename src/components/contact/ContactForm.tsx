@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { submitContactMessageAction } from "@/app/contact/actions";
 
 export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -15,13 +17,16 @@ export function ContactForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setErrorMessage(null);
 
-    // Simulate reliable dispatch & feedback
-    setTimeout(() => {
-      setLoading(false);
+    startTransition(async () => {
+      const result = await submitContactMessageAction(formData);
+      if (result.error) {
+        setErrorMessage(result.error);
+        return;
+      }
       setSubmitted(true);
-    }, 600);
+    });
   }
 
   if (submitted) {
@@ -65,6 +70,14 @@ export function ContactForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      {errorMessage && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+        >
+          {errorMessage}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label htmlFor="contact-name" className="block text-xs font-bold text-slate-700 uppercase">
@@ -145,10 +158,10 @@ export function ContactForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={isPending}
         className="rounded-xl bg-[#323C4B] hover:bg-[#242c37] text-white px-8 py-3.5 text-sm font-bold shadow-md transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
       >
-        {loading ? "Sending..." : "Send Message"}
+        {isPending ? "Sending..." : "Send Message"}
       </button>
     </form>
   );
