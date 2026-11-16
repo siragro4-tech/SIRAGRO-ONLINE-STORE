@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getVerifiedOrder } from "@/lib/orders";
+import { OrderConfirmationEffects } from "@/components/order/OrderConfirmationEffects";
 
 export const metadata: Metadata = {
   title: "Order Confirmation",
@@ -22,8 +23,52 @@ export default async function OrderConfirmationPage({
 
   const order = session_id ? await getVerifiedOrder(session_id) : null;
 
+  if (!order) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8 text-center">
+        <OrderConfirmationEffects isConfirmed={false} hasSessionId={Boolean(session_id)} />
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+          <svg className="h-8 w-8 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+        </div>
+
+        <span className="mt-4 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+          Awaiting Stripe Webhook Confirmation
+        </span>
+
+        <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-gray-900 sm:text-3xl">
+          {session_id ? "Confirming your payment..." : "No order session found"}
+        </h1>
+
+        <p className="mt-2 text-sm text-gray-600 max-w-md mx-auto">
+          {session_id
+            ? "We are waiting for Stripe's verified payment confirmation webhook. This page refreshes automatically in a moment."
+            : "We could not find a checkout session for this page. Please check your account orders or return to the store."}
+        </p>
+
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link
+            href="/account"
+            className="inline-flex items-center rounded-xl bg-[#323C4B] px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#242c37] transition-colors"
+          >
+            View My Orders
+          </Link>
+          <Link
+            href="/shop"
+            className="inline-flex items-center rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Continue Shopping
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+      <OrderConfirmationEffects isConfirmed={true} hasSessionId={Boolean(session_id)} />
       {/* Success Badge */}
       <div className="text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-700">

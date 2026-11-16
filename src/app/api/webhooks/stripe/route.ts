@@ -5,10 +5,17 @@ import { getStripeClient } from "@/lib/stripe";
 import { createOrderFromStripeSession } from "@/lib/orders";
 
 export async function POST(req: Request) {
-  const stripe = getStripeClient();
+  let stripe: ReturnType<typeof getStripeClient>;
+  try {
+    stripe = getStripeClient();
+  } catch (err) {
+    console.error("[Stripe Webhook] Stripe client not configured:", err);
+    return new NextResponse("Stripe secret key not configured", { status: 500 });
+  }
+
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!webhookSecret) {
+  if (!webhookSecret || webhookSecret.includes("your-stripe-webhook-secret")) {
     console.error("[Stripe Webhook] Missing STRIPE_WEBHOOK_SECRET environment variable.");
     return new NextResponse("Webhook secret not configured", { status: 500 });
   }
@@ -35,13 +42,18 @@ export async function POST(req: Request) {
 
   // 2. PROCESS VERIFIED STRIPE EVENTS
   switch (event.type) {
-    case "checkout.session.completed": {
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      // Only create order if payment actually succeeded
+      // Only create/mark order as paid if Stripe confirms payment_status === "paid"
       if (session.payment_status === "paid") {
         try {
-          await createOrderFromStripeSession(session);
+          const order = await createOrderFromStripeSession(session);
+          if (!order) {
+            console.error("[Stripe Webhook] Order creation returned null.");
+            return new NextResponse("Failed to persist order", { status: 500 });
+          }
         } catch (orderErr) {
           console.error("[Stripe Webhook] Failed to process order:", orderErr);
           // Return 500 so Stripe retries later if database was transiently down

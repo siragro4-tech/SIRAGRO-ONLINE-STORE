@@ -2,7 +2,15 @@ import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 import { getStripeClient } from "@/lib/stripe";
-import { clearBasket } from "@/lib/basket";
+
+function formatDeliveryAddress(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const addr = raw as { line1?: string; line2?: string; city?: string; postcode?: string };
+  const parts = [addr.line1, addr.line2, addr.city, addr.postcode]
+    .map((p) => (typeof p === "string" ? p.trim() : ""))
+    .filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
 
 export type OrderRecord = {
   id: string;
@@ -63,9 +71,7 @@ export async function createOrderFromStripeSession(
       customerEmail: existingOrder.customer_email,
       customerPhone: existingOrder.customer_phone,
       fulfilmentType: existingOrder.fulfilment_type as "delivery" | "collection",
-      deliveryAddress: existingOrder.delivery_address
-        ? JSON.stringify(existingOrder.delivery_address)
-        : null,
+      deliveryAddress: formatDeliveryAddress(existingOrder.delivery_address),
       subtotal: Number(existingOrder.subtotal),
       deliveryCharge: Number(existingOrder.delivery_charge),
       total: Number(existingOrder.total),
@@ -199,11 +205,21 @@ export async function createOrderFromStripeSession(
     });
   }
 
-  // 7. Clear the customer's basket
-  try {
-    await clearBasket();
-  } catch {
-    // Non-fatal
+  // 7. Clear the customer's database basket (webhook has no browser cookies)
+  if (profileId) {
+    try {
+      const { data: userBasket } = await supabase
+        .from("baskets")
+        .select("id")
+        .eq("profile_id", profileId)
+        .maybeSingle();
+
+      if (userBasket) {
+        await supabase.from("basket_items").delete().eq("basket_id", userBasket.id);
+      }
+    } catch {
+      // Non-fatal
+    }
   }
 
   // 8. Send Order Confirmation Email
@@ -233,7 +249,7 @@ export async function createOrderFromStripeSession(
     customerEmail,
     customerPhone,
     fulfilmentType,
-    deliveryAddress: rawAddress ? JSON.stringify(rawAddress) : null,
+    deliveryAddress: formatDeliveryAddress(rawAddress),
     subtotal,
     deliveryCharge: deliveryFee,
     total: grandTotal,
@@ -270,7 +286,7 @@ export async function getVerifiedOrder(sessionId: string): Promise<OrderRecord |
       customerEmail: order.customer_email,
       customerPhone: order.customer_phone,
       fulfilmentType: order.fulfilment_type as "delivery" | "collection",
-      deliveryAddress: order.delivery_address ? JSON.stringify(order.delivery_address) : null,
+      deliveryAddress: formatDeliveryAddress(order.delivery_address),
       subtotal: Number(order.subtotal),
       deliveryCharge: Number(order.delivery_charge),
       total: Number(order.total),
@@ -287,20 +303,7 @@ export async function getVerifiedOrder(sessionId: string): Promise<OrderRecord |
     };
   }
 
-  // Fallback: If webhook has not fired yet, retrieve session details directly from Stripe
-  try {
-    const stripe = getStripeClient();
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["line_items"],
-    });
-
-    if (session && session.payment_status === "paid") {
-      // Process order now
-      return await createOrderFromStripeSession(session);
-    }
-  } catch {
-    // Unconfigured or invalid session
-  }
-
+  // Only verified webhooks may create and mark orders as paid.
+  // If the webhook is still in flight, return null so the confirmation page shows a pending state.
   return null;
 }

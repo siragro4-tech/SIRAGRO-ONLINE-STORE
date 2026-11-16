@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { FALLBACK_PRODUCTS, type Product } from "@/lib/products";
 
 export const GUEST_BASKET_COOKIE = "siragro_guest_basket";
+export const GUEST_TOKEN_COOKIE = "siragro_guest_token";
 
 export type BasketItem = {
   productId: string;
@@ -50,6 +51,28 @@ async function setGuestCookieItems(items: { productId: string; quantity: number 
 }
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function getExistingGuestToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(GUEST_TOKEN_COOKIE)?.value;
+  return token && UUID_REGEX.test(token) ? token : null;
+}
+
+async function getOrCreateGuestToken(): Promise<string> {
+  const existing = await getExistingGuestToken();
+  if (existing) return existing;
+
+  const token = crypto.randomUUID();
+  const cookieStore = await cookies();
+  cookieStore.set(GUEST_TOKEN_COOKIE, token, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  return token;
+}
 
 /**
  * Resolves product details from Supabase by UUID, falling back to static products.
@@ -111,7 +134,7 @@ export async function getBasket(): Promise<BasketSummary> {
         .from("baskets")
         .select("id")
         .eq("profile_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (basket) {
         const { data: dbItems } = await supabase
@@ -127,8 +150,33 @@ export async function getBasket(): Promise<BasketSummary> {
         }
       }
     } else {
-      // 2. Guest shopper: read from secure cookie
-      rawItems = await getGuestCookieItems();
+      // 2. Guest shopper: read from Supabase guest basket first, then cookie fallback
+      const guestToken = await getExistingGuestToken();
+      if (guestToken) {
+        const { data: guestBasket } = await supabase
+          .from("baskets")
+          .select("id")
+          .eq("guest_token", guestToken)
+          .maybeSingle();
+
+        if (guestBasket) {
+          const { data: dbItems } = await supabase
+            .from("basket_items")
+            .select("product_id, quantity")
+            .eq("basket_id", guestBasket.id);
+
+          if (dbItems && dbItems.length > 0) {
+            rawItems = dbItems.map((item) => ({
+              productId: item.product_id,
+              quantity: item.quantity,
+            }));
+          }
+        }
+      }
+
+      if (rawItems.length === 0) {
+        rawItems = await getGuestCookieItems();
+      }
     }
   } catch {
     // Database offline or unconfigured: read from cookie
@@ -195,19 +243,23 @@ export async function addToBasket(productId: string, quantity: number = 1): Prom
 
   await setGuestCookieItems(currentItems);
 
-  // If user is authenticated, sync to database
+  // Sync to Supabase database (for both signed-in users and guest shoppers)
+  if (!UUID_REGEX.test(productId)) return;
+
   try {
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
+    let basketId: string | null = null;
+
     if (user) {
       let { data: basket } = await supabase
         .from("baskets")
         .select("id")
         .eq("profile_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!basket) {
         const { data: newBasket } = await supabase
@@ -217,31 +269,49 @@ export async function addToBasket(productId: string, quantity: number = 1): Prom
           .single();
         basket = newBasket;
       }
+      basketId = basket?.id ?? null;
+    } else {
+      const guestToken = await getOrCreateGuestToken();
+      let { data: basket } = await supabase
+        .from("baskets")
+        .select("id")
+        .eq("guest_token", guestToken)
+        .maybeSingle();
 
-      if (basket) {
-        const { data: existing } = await supabase
-          .from("basket_items")
-          .select("id, quantity")
-          .eq("basket_id", basket.id)
-          .eq("product_id", productId)
+      if (!basket) {
+        const { data: newBasket } = await supabase
+          .from("baskets")
+          .insert({ guest_token: guestToken })
+          .select("id")
           .single();
+        basket = newBasket;
+      }
+      basketId = basket?.id ?? null;
+    }
 
-        if (existing) {
-          await supabase
-            .from("basket_items")
-            .update({ quantity: existing.quantity + quantity })
-            .eq("id", existing.id);
-        } else {
-          await supabase.from("basket_items").insert({
-            basket_id: basket.id,
-            product_id: productId,
-            quantity,
-          });
-        }
+    if (basketId) {
+      const { data: existing } = await supabase
+        .from("basket_items")
+        .select("id, quantity")
+        .eq("basket_id", basketId)
+        .eq("product_id", productId)
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("basket_items")
+          .update({ quantity: existing.quantity + quantity })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("basket_items").insert({
+          basket_id: basketId,
+          product_id: productId,
+          quantity,
+        });
       }
     }
   } catch {
-    // Cookie was updated, so guest/offline mode is preserved
+    // Cookie was updated, so offline mode is preserved
   }
 }
 
@@ -264,38 +334,52 @@ export async function updateBasketQuantity(productId: string, quantity: number):
 
   await setGuestCookieItems(currentItems);
 
+  if (!UUID_REGEX.test(productId)) return;
+
   try {
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
+    let basketId: string | null = null;
     if (user) {
       const { data: basket } = await supabase
         .from("baskets")
         .select("id")
         .eq("profile_id", user.id)
-        .single();
+        .maybeSingle();
+      basketId = basket?.id ?? null;
+    } else {
+      const guestToken = await getExistingGuestToken();
+      if (guestToken) {
+        const { data: basket } = await supabase
+          .from("baskets")
+          .select("id")
+          .eq("guest_token", guestToken)
+          .maybeSingle();
+        basketId = basket?.id ?? null;
+      }
+    }
 
-      if (basket) {
-        if (quantity <= 0) {
-          await supabase
-            .from("basket_items")
-            .delete()
-            .eq("basket_id", basket.id)
-            .eq("product_id", productId);
-        } else {
-          await supabase
-            .from("basket_items")
-            .upsert(
-              {
-                basket_id: basket.id,
-                product_id: productId,
-                quantity,
-              },
-              { onConflict: "basket_id,product_id" }
-            );
-        }
+    if (basketId) {
+      if (quantity <= 0) {
+        await supabase
+          .from("basket_items")
+          .delete()
+          .eq("basket_id", basketId)
+          .eq("product_id", productId);
+      } else {
+        await supabase
+          .from("basket_items")
+          .upsert(
+            {
+              basket_id: basketId,
+              product_id: productId,
+              quantity,
+            },
+            { onConflict: "basket_id,product_id" }
+          );
       }
     }
   } catch {
@@ -323,16 +407,28 @@ export async function clearBasket(): Promise<void> {
       data: { user },
     } = await supabase.auth.getUser();
 
+    let basketId: string | null = null;
     if (user) {
       const { data: basket } = await supabase
         .from("baskets")
         .select("id")
         .eq("profile_id", user.id)
-        .single();
-
-      if (basket) {
-        await supabase.from("basket_items").delete().eq("basket_id", basket.id);
+        .maybeSingle();
+      basketId = basket?.id ?? null;
+    } else {
+      const guestToken = await getExistingGuestToken();
+      if (guestToken) {
+        const { data: basket } = await supabase
+          .from("baskets")
+          .select("id")
+          .eq("guest_token", guestToken)
+          .maybeSingle();
+        basketId = basket?.id ?? null;
       }
+    }
+
+    if (basketId) {
+      await supabase.from("basket_items").delete().eq("basket_id", basketId);
     }
   } catch {
     // Cookie cleared

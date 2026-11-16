@@ -6,7 +6,7 @@ import type { BasketItem } from "@/lib/basket";
  */
 export function getStripeClient(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) {
+  if (!secretKey || secretKey.includes("your-stripe-secret-key")) {
     throw new Error(
       "Missing STRIPE_SECRET_KEY in environment variables. Please configure your Stripe test key in .env.local."
     );
