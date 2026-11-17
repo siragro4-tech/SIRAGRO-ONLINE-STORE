@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isAdminRole } from "@/lib/admin-rules";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 export const metadata: Metadata = {
@@ -29,16 +30,28 @@ export default async function AdminLayout({
     redirect("/login?redirectTo=/admin");
   }
 
-  // Check admin role
+  // Check admin role in database
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .single();
 
-  // If user is not an admin, let them see forbidden page without sidebar
-  if (!profile || profile.role !== "admin") {
+  // If user is not an admin, allow /admin/forbidden to render cleanly without admin chrome;
+  // every protected page also calls requireAdminPage() on the server.
+  if (!profile || !isAdminRole(profile.role)) {
     return <>{children}</>;
+  }
+
+  let unreadAlertsCount = 0;
+  try {
+    const { count } = await supabase
+      .from("admin_activity_events")
+      .select("id", { count: "exact", head: true })
+      .eq("is_read", false);
+    unreadAlertsCount = count ?? 0;
+  } catch {
+    // Gracefully ignore if migration 004 is pending
   }
 
   const adminName =
@@ -47,14 +60,15 @@ export default async function AdminLayout({
       : profile.first_name || "Administrator";
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar userEmail={profile.email} adminName={adminName} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {children}
-        </main>
+    <div className="flex min-h-screen flex-col bg-slate-50 lg:flex-row">
+      <AdminSidebar
+        userEmail={profile.email}
+        adminName={adminName}
+        unreadAlertsCount={unreadAlertsCount}
+      />
+      <div className="flex flex-1 flex-col min-w-0">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );
 }
-

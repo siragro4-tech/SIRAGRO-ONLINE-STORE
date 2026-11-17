@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { BasketSummary } from "@/lib/basket";
 import { clearBasketAction } from "@/app/basket/actions";
@@ -11,6 +11,7 @@ interface BasketSummaryCardProps {
 
 export function BasketSummaryCard({ summary }: BasketSummaryCardProps) {
   const [isPending, startTransition] = useTransition();
+  const [clearError, setClearError] = useState<string | null>(null);
   const {
     subtotal,
     itemCount,
@@ -21,8 +22,12 @@ export function BasketSummaryCard({ summary }: BasketSummaryCardProps) {
 
   function handleClear() {
     if (confirm("Are you sure you want to empty your basket?")) {
+      setClearError(null);
       startTransition(async () => {
-        await clearBasketAction();
+        const res = await clearBasketAction();
+        if (res?.error) {
+          setClearError(res.error);
+        }
       });
     }
   }
@@ -112,6 +117,12 @@ export function BasketSummaryCard({ summary }: BasketSummaryCardProps) {
         >
           Empty basket
         </button>
+
+        {clearError && (
+          <p role="alert" className="text-xs text-red-700 font-medium text-center">
+            {clearError}
+          </p>
+        )}
       </div>
 
       {/* Trust info */}

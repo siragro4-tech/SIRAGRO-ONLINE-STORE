@@ -1,4 +1,18 @@
 import { Resend } from "resend";
+import {
+  isEmailProviderConfigured,
+  type EmailDispatchResult,
+} from "@/lib/email-status";
+
+export type { EmailDispatchResult };
+
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "object" && err !== null && "message" in err) {
+    return String((err as { message: unknown }).message);
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 export type OrderEmailDetails = {
   orderNumber: string;
@@ -21,7 +35,9 @@ export type OrderEmailDetails = {
 /**
  * Sends a transactional order confirmation email to the customer.
  */
-export async function sendOrderConfirmationEmail(details: OrderEmailDetails) {
+export async function sendOrderConfirmationEmail(
+  details: OrderEmailDetails
+): Promise<EmailDispatchResult> {
   const apiKey = process.env.RESEND_API_KEY;
 
   const itemsHtml = details.items
@@ -44,9 +60,9 @@ export async function sendOrderConfirmationEmail(details: OrderEmailDetails) {
         <title>Order Confirmation - SIRAGRO</title>
       </head>
       <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="background-color: #16a34a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+        <div style="background-color: #323C4B; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
           <h1 style="color: #ffffff; margin: 0; font-size: 24px;">SIRAGRO Supermarket</h1>
-          <p style="color: #dcfce7; margin: 5px 0 0 0; font-size: 14px;">Thank you for your order!</p>
+          <p style="color: #cbd5e1; margin: 5px 0 0 0; font-size: 14px;">Thank you for your order!</p>
         </div>
 
         <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 8px 8px;">
@@ -101,12 +117,15 @@ export async function sendOrderConfirmationEmail(details: OrderEmailDetails) {
     </html>
   `;
 
-  if (!apiKey || apiKey === "re_your-resend-api-key") {
-    // Development / unconfigured fallback: log email to console
-    console.log(
-      `[DEV EMAIL SIMULATION] Confirmation email for order ${details.orderNumber} to ${details.customerEmail}: Total £${details.total.toFixed(2)}`
+  if (!isEmailProviderConfigured(apiKey)) {
+    console.warn(
+      `[Email Not Configured] Confirmation email for order #${details.orderNumber} was NOT sent (RESEND_API_KEY missing).`
     );
-    return { success: true, simulated: true };
+    return {
+      success: false,
+      notConfigured: true,
+      error: "Email provider (RESEND_API_KEY) is not configured — email was not sent.",
+    };
   }
 
   try {
@@ -119,14 +138,16 @@ export async function sendOrderConfirmationEmail(details: OrderEmailDetails) {
     });
 
     if (error) {
-      console.error("[Resend Error]:", error);
-      return { success: false, error };
+      const msg = extractErrorMessage(error, "Failed to send confirmation email");
+      console.error(`[Resend Confirmation Error] Order #${details.orderNumber}:`, msg);
+      return { success: false, error: msg };
     }
 
     return { success: true, data };
   } catch (err) {
-    console.error("[Email Exception]:", err);
-    return { success: false, error: err };
+    const msg = extractErrorMessage(err, "Email exception occurred");
+    console.error(`[Email Exception] Order #${details.orderNumber}:`, msg);
+    return { success: false, error: msg };
   }
 }
 
@@ -182,11 +203,9 @@ const STATUS_TITLES: Record<string, { subject: string; heading: string; message:
 /**
  * Sends a transactional order status update email to the customer.
  */
-export async function sendStatusUpdateEmail(details: StatusUpdateEmailDetails): Promise<{
-  success: boolean;
-  simulated?: boolean;
-  error?: string;
-}> {
+export async function sendStatusUpdateEmail(
+  details: StatusUpdateEmailDetails
+): Promise<EmailDispatchResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const statusConfig = STATUS_TITLES[details.newStatus] || {
     subject: `Order Status Update: ${details.newStatus}`,
@@ -244,11 +263,15 @@ export async function sendStatusUpdateEmail(details: StatusUpdateEmailDetails): 
     </html>
   `;
 
-  if (!apiKey || apiKey === "re_your-resend-api-key") {
-    console.log(
-      `[DEV EMAIL SIMULATION] Status update email for order ${details.orderNumber} (${details.newStatus}) to ${details.customerEmail}`
+  if (!isEmailProviderConfigured(apiKey)) {
+    console.warn(
+      `[Email Not Configured] Status email for order #${details.orderNumber} (${details.newStatus}) was NOT sent (RESEND_API_KEY missing).`
     );
-    return { success: true, simulated: true };
+    return {
+      success: false,
+      notConfigured: true,
+      error: "Email provider (RESEND_API_KEY) is not configured — email was not sent.",
+    };
   }
 
   try {
@@ -261,15 +284,103 @@ export async function sendStatusUpdateEmail(details: StatusUpdateEmailDetails): 
     });
 
     if (error) {
-      console.error("[Resend Status Email Error]:", error);
-      return { success: false, error: typeof error === "object" && "message" in error ? String(error.message) : "Failed to send email via Resend" };
+      const msg = extractErrorMessage(error, "Failed to send email via Resend");
+      console.error(`[Resend Status Email Error] Order #${details.orderNumber}:`, msg);
+      return { success: false, error: msg };
     }
 
     return { success: true };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Email exception occurred";
-    console.error("[Email Exception in sendStatusUpdateEmail]:", message);
+    const message = extractErrorMessage(err, "Email exception occurred");
+    console.error(`[Email Exception in sendStatusUpdateEmail] Order #${details.orderNumber}:`, message);
     return { success: false, error: message };
+  }
+}
+
+/**
+ * Sends a notification email to the store owner when a paid order is confirmed
+ * via a verified Stripe webhook. Uses ADMIN_NOTIFICATION_EMAIL (or STORE_OWNER_EMAIL).
+ */
+export async function sendOwnerOrderNotificationEmail(
+  details: OrderEmailDetails
+): Promise<EmailDispatchResult> {
+  const ownerEmail =
+    process.env.ADMIN_NOTIFICATION_EMAIL || process.env.STORE_OWNER_EMAIL;
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!ownerEmail || !ownerEmail.trim()) {
+    console.warn(
+      `[Owner Alert Not Configured] Paid order #${details.orderNumber} — ADMIN_NOTIFICATION_EMAIL missing.`
+    );
+    return {
+      success: false,
+      notConfigured: true,
+      skipped: true,
+      error: "Owner notification email is not configured — alert was not sent.",
+    };
+  }
+
+  const itemsListHtml = details.items
+    .map(
+      (item) =>
+        `<li>${item.quantity} × ${item.name} — £${item.lineTotal.toFixed(2)}</li>`
+    )
+    .join("");
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head><meta charset="utf-8"><title>New Paid Order #${details.orderNumber}</title></head>
+      <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #323C4B; padding: 18px 20px; border-radius: 8px 8px 0 0; color: #ffffff;">
+          <h1 style="margin: 0; font-size: 18px;">SIRAGRO Store Alert — Paid Order Confirmed</h1>
+          <p style="margin: 4px 0 0 0; font-size: 13px; color: #cbd5e1;">Verified via Stripe Webhook • Ref #${details.orderNumber}</p>
+        </div>
+        <div style="border: 1px solid #e5e7eb; border-top: none; padding: 20px; border-radius: 0 0 8px 8px; background: #ffffff;">
+          <p style="margin-top: 0;"><strong>Customer:</strong> ${details.customerName} (${details.customerEmail})</p>
+          <p><strong>Fulfilment:</strong> ${details.fulfilmentType === "delivery" ? "Home Delivery" : "In-Store Collection"}</p>
+          ${details.deliveryAddress ? `<p><strong>Delivery Address:</strong> ${details.deliveryAddress}</p>` : ""}
+          ${details.hasAgeRestrictedItems ? `<p style="color: #b91c1c; font-weight: bold;">Challenge 25 Required: Contains 18+ age-restricted items.</p>` : ""}
+          <p><strong>Items:</strong></p>
+          <ul>${itemsListHtml}</ul>
+          <p style="font-size: 16px; font-weight: bold; color: #15803d;">Total Paid: £${details.total.toFixed(2)}</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  if (!isEmailProviderConfigured(apiKey)) {
+    console.warn(
+      `[Email Not Configured] Owner alert for paid order #${details.orderNumber} was NOT sent (RESEND_API_KEY missing).`
+    );
+    return {
+      success: false,
+      notConfigured: true,
+      error: "Email provider (RESEND_API_KEY) is not configured — owner alert was not sent.",
+    };
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const { error } = await resend.emails.send({
+      from: "SIRAGRO Store Alerts <orders@siragro.co.uk>",
+      to: [ownerEmail],
+      subject: `[SIRAGRO Paid Order] #${details.orderNumber} — £${details.total.toFixed(2)} (${details.fulfilmentType})`,
+      html: emailHtml,
+    });
+
+    if (error) {
+      const msg = extractErrorMessage(error, "Resend owner alert error");
+      console.error(`[Resend Owner Alert Error] Order #${details.orderNumber}:`, msg);
+      return { success: false, error: msg };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: extractErrorMessage(err, "Failed to send owner alert email"),
+    };
   }
 }
 

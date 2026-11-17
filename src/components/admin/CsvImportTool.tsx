@@ -21,6 +21,7 @@ const SAMPLE_CSV_ROWS = [
 export function CsvImportTool() {
   const [csvContent, setCsvContent] = useState("");
   const [activeTab, setActiveTab] = useState<"file" | "paste">("file");
+  const [duplicateMode, setDuplicateMode] = useState<"update" | "skip">("update");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [previewRows, setPreviewRows] = useState<string[][]>([]);
@@ -70,7 +71,7 @@ export function CsvImportTool() {
     setResult(null);
 
     try {
-      const res = await importProductsCsvAction(csvContent);
+      const res = await importProductsCsvAction(csvContent, duplicateMode);
       setResult(res);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Import failed";
@@ -79,6 +80,7 @@ export function CsvImportTool() {
         totalParsed: 0,
         importedCount: 0,
         updatedCount: 0,
+        skippedCount: 0,
         errors: [{ row: 0, name: "System", error: msg }],
       });
     } finally {
@@ -268,14 +270,27 @@ export function CsvImportTool() {
           </div>
         )}
 
-        {/* Action Button */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-          <Link
-            href="/admin/products"
-            className="text-xs font-semibold text-gray-600 hover:underline"
-          >
-            &larr; Back to Products
-          </Link>
+        {/* Duplicate Handling Selector & Action Button */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pt-4 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              href="/admin/products"
+              className="text-xs font-semibold text-gray-600 hover:underline"
+            >
+              &larr; Back to Products
+            </Link>
+            <label className="flex items-center gap-2 text-xs text-slate-700">
+              <span className="font-semibold">If slug exists:</span>
+              <select
+                value={duplicateMode}
+                onChange={(e) => setDuplicateMode(e.target.value as "update" | "skip")}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-[#323C4B]"
+              >
+                <option value="update">Update existing product</option>
+                <option value="skip">Skip duplicate row</option>
+              </select>
+            </label>
+          </div>
 
           <button
             type="button"
@@ -340,14 +355,18 @@ export function CsvImportTool() {
 
           <p className="text-sm text-gray-700">{result.message}</p>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
             <div className="rounded-lg bg-white p-3 border border-gray-200">
               <div className="text-xs text-gray-500 font-semibold uppercase">Created</div>
-              <div className="text-2xl font-black text-green-700">{result.importedCount}</div>
+              <div className="text-2xl font-black text-emerald-700">{result.importedCount}</div>
             </div>
             <div className="rounded-lg bg-white p-3 border border-gray-200">
               <div className="text-xs text-gray-500 font-semibold uppercase">Updated</div>
               <div className="text-2xl font-black text-blue-700">{result.updatedCount}</div>
+            </div>
+            <div className="rounded-lg bg-white p-3 border border-gray-200">
+              <div className="text-xs text-gray-500 font-semibold uppercase">Skipped</div>
+              <div className="text-2xl font-black text-slate-600">{result.skippedCount}</div>
             </div>
             <div className="rounded-lg bg-white p-3 border border-gray-200">
               <div className="text-xs text-gray-500 font-semibold uppercase">Failed</div>
@@ -376,7 +395,7 @@ export function CsvImportTool() {
           <div className="pt-2 flex justify-end">
             <Link
               href="/admin/products"
-              className="rounded-lg bg-green-700 px-4 py-2 text-xs font-bold text-white hover:bg-green-800 transition-colors"
+              className="rounded-lg bg-[#323C4B] px-4 py-2 text-xs font-bold text-white hover:bg-[#242c37] transition-colors"
             >
               View Updated Products &rarr;
             </Link>

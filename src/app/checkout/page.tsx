@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBasket } from "@/lib/basket";
+import { getFulfilmentAvailability } from "@/lib/delivery";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 
@@ -11,7 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default async function CheckoutPage() {
-  const summary = await getBasket();
+  const [summary, availability] = await Promise.all([
+    getBasket(),
+    getFulfilmentAvailability(),
+  ]);
 
   // If the basket is empty, redirect to the basket page
   if (summary.items.length === 0) {
@@ -65,7 +69,11 @@ export default async function CheckoutPage() {
       </div>
 
       {/* Render Checkout Form */}
-      <CheckoutForm summary={summary} initialProfile={initialProfile} />
+      <CheckoutForm
+        summary={summary}
+        initialProfile={initialProfile}
+        availability={availability}
+      />
     </div>
   );
 }

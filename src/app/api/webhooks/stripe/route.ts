@@ -2,7 +2,14 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripeClient } from "@/lib/stripe";
-import { createOrderFromStripeSession } from "@/lib/orders";
+import { isMissingStripeEventsTableError } from "@/lib/stripe-rules";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  createOrderFromStripeSession,
+  handleStripeChargeRefunded,
+} from "@/lib/orders";
+import { recordAdminActivity } from "@/lib/activity";
+import type { Json } from "@/types/database.types";
 
 export async function POST(req: Request) {
   let stripe: ReturnType<typeof getStripeClient>;
@@ -40,7 +47,33 @@ export async function POST(req: Request) {
     return new NextResponse(`Webhook Error: ${message}`, { status: 400 });
   }
 
-  // 2. PROCESS VERIFIED STRIPE EVENTS
+  // 2. CHECK DURABLE WEBHOOK EVENT DEDUPLICATION (BEFORE HANDLING)
+  const adminSupabase = createAdminClient();
+  let deduplicationSupported = true;
+
+  const { data: alreadyProcessed, error: dedupLookupErr } = await adminSupabase
+    .from("stripe_webhook_events")
+    .select("event_id")
+    .eq("event_id", event.id)
+    .maybeSingle();
+
+  if (dedupLookupErr) {
+    if (isMissingStripeEventsTableError(dedupLookupErr)) {
+      deduplicationSupported = false;
+    } else {
+      console.error(
+        `[Stripe Webhook] Failed to check webhook event deduplication (${event.id}):`,
+        dedupLookupErr.message
+      );
+      return new NextResponse("Webhook deduplication check failed", {
+        status: 500,
+      });
+    }
+  } else if (alreadyProcessed) {
+    return NextResponse.json({ received: true, deduplicated: true });
+  }
+
+  // 3. PROCESS VERIFIED STRIPE EVENTS
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
@@ -59,6 +92,46 @@ export async function POST(req: Request) {
           // Return 500 so Stripe retries later if database was transiently down
           return new NextResponse("Failed to process order", { status: 500 });
         }
+      } else {
+        await recordAdminActivity({
+          event_type: "order_placed_unpaid",
+          severity: "warning",
+          title: "Checkout submitted — awaiting payment settlement",
+          summary: `Stripe webhook reported checkout session (${session.id.slice(-8)}) with status "${session.payment_status}". Order will not be marked paid until Stripe confirms settlement.`,
+          metadata: {
+            stripe_session_id: session.id,
+            payment_status: session.payment_status,
+          } as Json,
+        });
+      }
+      break;
+    }
+
+    case "checkout.session.async_payment_failed":
+    case "payment_intent.payment_failed": {
+      const obj = event.data.object as { id?: string; last_payment_error?: { message?: string } };
+      await recordAdminActivity({
+        event_type: "order_payment_failed",
+        severity: "error",
+        title: "Stripe payment failed",
+        summary: obj.last_payment_error?.message
+          ? `Payment attempt failed: ${obj.last_payment_error.message}`
+          : "Customer payment attempt failed before settlement.",
+        metadata: {
+          stripe_event_id: event.id,
+          stripe_object_id: obj.id || null,
+        } as Json,
+      });
+      break;
+    }
+
+    case "charge.refunded": {
+      const charge = event.data.object as Stripe.Charge;
+      try {
+        await handleStripeChargeRefunded(charge);
+      } catch (refundErr) {
+        console.error("[Stripe Webhook] Failed to record refund:", refundErr);
+        return new NextResponse("Failed to process refund", { status: 500 });
       }
       break;
     }
@@ -66,6 +139,25 @@ export async function POST(req: Request) {
     default:
       // Acknowledge receipt of other Stripe event types without error
       break;
+  }
+
+  // 4. MARK EVENT PROCESSED ONLY AFTER ALL REQUIRED DATABASE EFFECTS SUCCEED
+  if (deduplicationSupported) {
+    const { error: dedupInsertErr } = await adminSupabase
+      .from("stripe_webhook_events")
+      .insert({
+        event_id: event.id,
+        event_type: event.type,
+      });
+
+    if (dedupInsertErr && dedupInsertErr.code !== "23505") {
+      if (!isMissingStripeEventsTableError(dedupInsertErr)) {
+        console.error(
+          `[Stripe Webhook] Failed to record processed event ${event.id}:`,
+          dedupInsertErr.message
+        );
+      }
+    }
   }
 
   return NextResponse.json({ received: true });

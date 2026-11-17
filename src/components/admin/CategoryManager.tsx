@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Database } from "@/types/database.types";
 import {
   createCategoryAction,
@@ -15,9 +16,14 @@ type CategoryRow = Database["public"]["Tables"]["categories"]["Row"] & {
 
 interface CategoryManagerProps {
   categories: CategoryRow[];
+  loadError?: string | null;
 }
 
-export function CategoryManager({ categories }: CategoryManagerProps) {
+export function CategoryManager({
+  categories,
+  loadError = null,
+}: CategoryManagerProps) {
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryRow | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,6 +94,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
 
     if (res.success) {
       setFeedback({ type: "success", text: res.message || "Operation successful" });
+      router.refresh();
       setTimeout(() => {
         setModalOpen(false);
       }, 700);
@@ -111,6 +118,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
 
     if (res.success) {
       setFeedback({ type: "success", text: res.message || "Category deleted" });
+      router.refresh();
     } else {
       setFeedback({ type: "error", text: res.error || "Could not delete category" });
     }
@@ -121,7 +129,9 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
     const res = await toggleCategoryStatusAction(cat.id, cat.is_active);
     setLoading(false);
 
-    if (!res.success) {
+    if (res.success) {
+      router.refresh();
+    } else {
       setFeedback({ type: "error", text: res.error || "Could not update status" });
     }
   }
@@ -157,6 +167,13 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
           Add New Category
         </button>
       </div>
+
+      {/* Load Error */}
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <strong>Unable to load categories:</strong> {loadError}
+        </div>
+      )}
 
       {/* Global Feedback message */}
       {feedback && (

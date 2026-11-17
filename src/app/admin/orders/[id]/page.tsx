@@ -353,6 +353,14 @@ export default async function AdminOrderDetailPage({ params }: OrderDetailPagePr
                   </span>
                 </div>
               )}
+              {order.stripe_checkout_session_id && (
+                <div className="pt-2 text-xs">
+                  <span className="text-gray-500 block font-semibold uppercase">Checkout Session Ref</span>
+                  <span className="font-mono text-gray-600 text-[11px] break-all">
+                    {order.stripe_checkout_session_id}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

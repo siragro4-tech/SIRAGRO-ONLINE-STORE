@@ -9,6 +9,7 @@ import {
   updateProductAction,
 } from "@/app/admin/products/actions";
 import { getProductImageUrl } from "@/lib/product-image";
+import { validateProductImageFile } from "@/lib/admin-rules";
 
 type ProductRow = Database["public"]["Tables"]["products"]["Row"] & {
   category?: Database["public"]["Tables"]["categories"]["Row"] | null;
@@ -43,6 +44,11 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
   const [stockQuantity, setStockQuantity] = useState(
     initialProduct?.stock_quantity !== undefined ? String(initialProduct.stock_quantity) : "10"
   );
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    initialProduct?.low_stock_threshold !== undefined
+      ? String(initialProduct.low_stock_threshold)
+      : "10"
+  );
   const [barcode, setBarcode] = useState(initialProduct?.barcode || "");
   const [weightKg, setWeightKg] = useState(
     initialProduct?.weight_kg ? String(initialProduct.weight_kg) : ""
@@ -63,6 +69,7 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
     existingPrimaryImage ? getProductImageUrl(existingPrimaryImage) : ""
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
 
   function handleNameChange(val: string) {
     setName(val);
@@ -77,18 +84,39 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const objectUrl = URL.createObjectURL(file);
-      setPreviewUrl(objectUrl);
+    if (!file) return;
+
+    const check = validateProductImageFile({
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
+
+    if (!check.valid) {
+      setErrorMessage(check.error);
+      e.target.value = "";
+      return;
     }
+
+    setErrorMessage(null);
+    setRemoveImage(false);
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
   }
 
   function handleUrlChange(url: string) {
     setImageUrl(url);
+    if (url.trim()) setRemoveImage(false);
     if (!selectedFile) {
       setPreviewUrl(url ? getProductImageUrl(url) : "");
     }
+  }
+
+  function handleRemoveImage() {
+    setSelectedFile(null);
+    setImageUrl("");
+    setPreviewUrl("");
+    setRemoveImage(true);
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -106,6 +134,7 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
     formData.append("compare_at_price", compareAtPrice);
     formData.append("unit", unit);
     formData.append("stock_quantity", stockQuantity);
+    formData.append("low_stock_threshold", lowStockThreshold);
     formData.append("barcode", barcode);
     formData.append("weight_kg", weightKg);
     formData.append("is_available", isAvailable ? "true" : "false");
@@ -115,6 +144,7 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
     formData.append("seo_title", seoTitle);
     formData.append("seo_description", seoDescription);
     formData.append("image_url", imageUrl);
+    formData.append("remove_image", removeImage ? "true" : "false");
 
     if (selectedFile) {
       formData.append("image_file", selectedFile);
@@ -352,7 +382,21 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
               value={stockQuantity}
               onChange={(e) => setStockQuantity(e.target.value)}
               placeholder="e.g. 50"
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 focus:border-green-600 focus:ring-1 focus:ring-green-600"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 focus:border-[#323C4B] focus:ring-1 focus:ring-[#323C4B]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+              Low-Stock Alert Threshold
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={lowStockThreshold}
+              onChange={(e) => setLowStockThreshold(e.target.value)}
+              placeholder="10"
+              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-900 focus:border-[#323C4B] focus:ring-1 focus:ring-[#323C4B]"
             />
           </div>
 
@@ -465,12 +509,12 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
               </label>
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleFileChange}
-                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 cursor-pointer"
+                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-100 file:text-[#323C4B] hover:file:bg-slate-200 cursor-pointer"
               />
               <p className="mt-1 text-xs text-gray-500">
-                PNG, JPG or WebP. Auto-uploaded to Supabase Storage bucket <code>product-images</code>.
+                JPG, PNG or WebP only (max 5 MB). Stored in Supabase Storage bucket <code>product-images</code>, never inside the database.
               </p>
             </div>
 
@@ -513,6 +557,15 @@ export function ProductForm({ initialProduct, categories }: ProductFormProps) {
                 </div>
               )}
             </div>
+            {previewUrl && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="mt-3 rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+              >
+                Remove Image
+              </button>
+            )}
           </div>
         </div>
       </div>

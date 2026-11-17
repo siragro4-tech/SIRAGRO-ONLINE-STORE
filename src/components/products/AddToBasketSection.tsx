@@ -13,13 +13,20 @@ export function AddToBasketSection({ product }: AddToBasketSectionProps) {
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const isOutOfStock = product.stock_quantity <= 0;
   const maxAllowed = Math.min(product.stock_quantity, 20);
 
   function handleAdd() {
+    setErrorMessage(null);
     startTransition(async () => {
-      await addBasketItemAction(product.id, quantity);
+      const summary = await addBasketItemAction(product.id, quantity);
+      if (summary?.error) {
+        setAdded(false);
+        setErrorMessage(summary.error);
+        return;
+      }
       setAdded(true);
       router.refresh();
       setTimeout(() => setAdded(false), 2500);
@@ -54,7 +61,7 @@ export function AddToBasketSection({ product }: AddToBasketSectionProps) {
           </button>
         </div>
 
-        {/* Add to Basket Button */}
+        {/* Add to Cart Button */}
         <button
           type="button"
           disabled={isOutOfStock || isPending}
@@ -62,21 +69,27 @@ export function AddToBasketSection({ product }: AddToBasketSectionProps) {
           className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-8 py-3.5 text-base font-bold text-white shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? (
-            "Adding to basket..."
+            "Adding to cart..."
           ) : added ? (
             <>
               <svg className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
               </svg>
-              Added to Basket!
+              Added to Cart!
             </>
           ) : isOutOfStock ? (
             "Out of Stock"
           ) : (
-            `Add to Basket • £${(product.price * quantity).toFixed(2)}`
+            `Add to Cart • £${(product.price * quantity).toFixed(2)}`
           )}
         </button>
       </div>
+
+      {errorMessage && (
+        <p role="alert" className="mt-2 text-xs text-red-700 font-medium">
+          {errorMessage}
+        </p>
+      )}
 
       {isOutOfStock && (
         <p className="mt-2 text-xs text-red-600 font-medium">

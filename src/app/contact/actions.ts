@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { recordAdminActivity } from "@/lib/activity";
 
 export type ContactActionResult = {
   success?: boolean;
@@ -41,6 +42,14 @@ export async function submitContactMessageAction(input: {
           "We could not save your message right now. Please try again or call us on 020 8813 6458.",
       };
     }
+
+    await recordAdminActivity({
+      event_type: "contact_message",
+      severity: "info",
+      title: `New enquiry: ${subject}`,
+      summary: `Customer contact message saved (${subject}). View details in Contact Messages.`,
+      metadata: { subject },
+    });
 
     return { success: true };
   } catch (err) {

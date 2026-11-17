@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Product } from "@/lib/products";
 import { QuickAddOverlay } from "./QuickAddOverlay";
+import { getProductImageUrl } from "@/lib/product-image";
 
 interface ProductCardProps {
   product: Product;
@@ -183,6 +184,10 @@ export function ProductCard({ product }: ProductCardProps) {
     product.compare_at_price && product.compare_at_price > product.price;
   const isOutOfStock = product.stock_quantity <= 0;
   const categorySlug = product.category?.slug;
+  const primaryImage = product.images?.find((img) => img.is_primary) || product.images?.[0];
+  const uploadedImageUrl = primaryImage?.storage_path
+    ? getProductImageUrl(primaryImage.storage_path)
+    : null;
 
   return (
     <article
@@ -190,9 +195,18 @@ export function ProductCard({ product }: ProductCardProps) {
       aria-labelledby={`product-heading-${product.id}`}
     >
       <div>
-        {/* Product Image Area — premium brand-coloured mockup */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-lg group-hover:scale-[1.02] transition-transform duration-300">
-          <CategoryMockup slug={categorySlug} brand={product.brand ?? undefined} className="w-full h-full" />
+        {/* Product Image Area — uploaded product photo or brand-coloured category mockup */}
+        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-slate-50 group-hover:scale-[1.02] transition-transform duration-300">
+          {uploadedImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={uploadedImageUrl}
+              alt={primaryImage?.alt_text || product.name}
+              className="h-full w-full object-contain p-2"
+            />
+          ) : (
+            <CategoryMockup slug={categorySlug} brand={product.brand ?? undefined} className="w-full h-full" />
+          )}
 
           {/* Badges */}
           <div className="absolute left-2 top-2 flex flex-col gap-1 z-10">

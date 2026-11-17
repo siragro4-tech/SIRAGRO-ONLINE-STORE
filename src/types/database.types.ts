@@ -134,6 +134,7 @@ export type Database = {
           compare_at_price: number | null;
           unit: string | null;
           stock_quantity: number;
+          low_stock_threshold?: number;
           is_available: boolean;
           is_age_restricted: boolean;
           minimum_age: number | null;
@@ -155,6 +156,7 @@ export type Database = {
           compare_at_price?: number | null;
           unit?: string | null;
           stock_quantity?: number;
+          low_stock_threshold?: number;
           is_available?: boolean;
           is_age_restricted?: boolean;
           minimum_age?: number | null;
@@ -176,6 +178,7 @@ export type Database = {
           compare_at_price?: number | null;
           unit?: string | null;
           stock_quantity?: number;
+          low_stock_threshold?: number;
           is_available?: boolean;
           is_age_restricted?: boolean;
           minimum_age?: number | null;
@@ -291,6 +294,7 @@ export type Database = {
           subtotal: number;
           delivery_charge: number;
           total: number;
+          refunded_amount?: number;
           stripe_checkout_session_id: string | null;
           stripe_payment_intent_id: string | null;
           payment_status: "unpaid" | "paid" | "refunded" | "failed";
@@ -319,6 +323,7 @@ export type Database = {
           subtotal: number;
           delivery_charge?: number;
           total: number;
+          refunded_amount?: number;
           stripe_checkout_session_id?: string | null;
           stripe_payment_intent_id?: string | null;
           payment_status?: "unpaid" | "paid" | "refunded" | "failed";
@@ -347,6 +352,7 @@ export type Database = {
           subtotal?: number;
           delivery_charge?: number;
           total?: number;
+          refunded_amount?: number;
           stripe_checkout_session_id?: string | null;
           stripe_payment_intent_id?: string | null;
           payment_status?: "unpaid" | "paid" | "refunded" | "failed";
@@ -433,6 +439,7 @@ export type Database = {
           distance_method: "haversine" | "driving";
           is_delivery_enabled: boolean;
           is_collection_enabled: boolean;
+          is_delivery_pricing_confirmed?: boolean;
           notes: string | null;
           updated_at: string;
         };
@@ -448,6 +455,7 @@ export type Database = {
           distance_method?: "haversine" | "driving";
           is_delivery_enabled?: boolean;
           is_collection_enabled?: boolean;
+          is_delivery_pricing_confirmed?: boolean;
           notes?: string | null;
           updated_at?: string;
         };
@@ -463,6 +471,7 @@ export type Database = {
           distance_method?: "haversine" | "driving";
           is_delivery_enabled?: boolean;
           is_collection_enabled?: boolean;
+          is_delivery_pricing_confirmed?: boolean;
           notes?: string | null;
           updated_at?: string;
         };
@@ -562,7 +571,7 @@ export type Database = {
           recipient_email: string;
           notification_type: string;
           status_target: string;
-          send_status: "pending" | "sent" | "failed";
+          send_status: "pending" | "sent" | "failed" | "not_configured";
           attempt_count: number;
           last_error: string | null;
           sent_at: string | null;
@@ -575,7 +584,7 @@ export type Database = {
           recipient_email: string;
           notification_type?: string;
           status_target: string;
-          send_status?: "pending" | "sent" | "failed";
+          send_status?: "pending" | "sent" | "failed" | "not_configured";
           attempt_count?: number;
           last_error?: string | null;
           sent_at?: string | null;
@@ -588,12 +597,183 @@ export type Database = {
           recipient_email?: string;
           notification_type?: string;
           status_target?: string;
-          send_status?: "pending" | "sent" | "failed";
+          send_status?: "pending" | "sent" | "failed" | "not_configured";
           attempt_count?: number;
           last_error?: string | null;
           sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      admin_activity_events: {
+        Row: {
+          id: string;
+          event_type:
+            | "order_placed_unpaid"
+            | "order_paid"
+            | "order_refunded"
+            | "order_payment_failed"
+            | "cart_activity"
+            | "low_stock_alert"
+            | "out_of_stock_alert"
+            | "inventory_adjusted"
+            | "order_status_updated"
+            | "contact_message";
+          severity: "info" | "success" | "warning" | "error";
+          title: string;
+          summary: string;
+          order_id: string | null;
+          product_id: string | null;
+          metadata: Json;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_type:
+            | "order_placed_unpaid"
+            | "order_paid"
+            | "order_refunded"
+            | "order_payment_failed"
+            | "cart_activity"
+            | "low_stock_alert"
+            | "out_of_stock_alert"
+            | "inventory_adjusted"
+            | "order_status_updated"
+            | "contact_message";
+          severity?: "info" | "success" | "warning" | "error";
+          title: string;
+          summary: string;
+          order_id?: string | null;
+          product_id?: string | null;
+          metadata?: Json;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_type?:
+            | "order_placed_unpaid"
+            | "order_paid"
+            | "order_refunded"
+            | "order_payment_failed"
+            | "cart_activity"
+            | "low_stock_alert"
+            | "out_of_stock_alert"
+            | "inventory_adjusted"
+            | "order_status_updated"
+            | "contact_message";
+          severity?: "info" | "success" | "warning" | "error";
+          title?: string;
+          summary?: string;
+          order_id?: string | null;
+          product_id?: string | null;
+          metadata?: Json;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      cart_activity_daily: {
+        Row: {
+          id: string;
+          activity_date: string;
+          product_id: string;
+          product_name_snapshot: string;
+          add_count: number;
+          total_units_added: number;
+          last_added_at: string;
+        };
+        Insert: {
+          id?: string;
+          activity_date?: string;
+          product_id: string;
+          product_name_snapshot: string;
+          add_count?: number;
+          total_units_added?: number;
+          last_added_at?: string;
+        };
+        Update: {
+          id?: string;
+          activity_date?: string;
+          product_id?: string;
+          product_name_snapshot?: string;
+          add_count?: number;
+          total_units_added?: number;
+          last_added_at?: string;
+        };
+        Relationships: [];
+      };
+      inventory_adjustments: {
+        Row: {
+          id: string;
+          product_id: string;
+          previous_quantity: number;
+          new_quantity: number;
+          delta: number;
+          reason:
+            | "admin_quick_edit"
+            | "admin_product_edit"
+            | "admin_product_create"
+            | "csv_import"
+            | "order_paid";
+          changed_by_profile_id: string | null;
+          changed_by_email: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          previous_quantity: number;
+          new_quantity: number;
+          delta: number;
+          reason:
+            | "admin_quick_edit"
+            | "admin_product_edit"
+            | "admin_product_create"
+            | "csv_import"
+            | "order_paid";
+          changed_by_profile_id?: string | null;
+          changed_by_email?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          previous_quantity?: number;
+          new_quantity?: number;
+          delta?: number;
+          reason?:
+            | "admin_quick_edit"
+            | "admin_product_edit"
+            | "admin_product_create"
+            | "csv_import"
+            | "order_paid";
+          changed_by_profile_id?: string | null;
+          changed_by_email?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      stripe_webhook_events: {
+        Row: {
+          event_id: string;
+          event_type: string;
+          processed_at: string;
+        };
+        Insert: {
+          event_id: string;
+          event_type: string;
+          processed_at?: string;
+        };
+        Update: {
+          event_id?: string;
+          event_type?: string;
+          processed_at?: string;
         };
         Relationships: [];
       };

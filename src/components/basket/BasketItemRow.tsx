@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import type { BasketItem } from "@/lib/basket";
 import { updateBasketItemQuantityAction, removeBasketItemAction } from "@/app/basket/actions";
@@ -12,18 +12,27 @@ interface BasketItemRowProps {
 
 export function BasketItemRow({ item }: BasketItemRowProps) {
   const [isPending, startTransition] = useTransition();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { product, quantity, lineTotal } = item;
   const maxStock = Math.min(product.stock_quantity, 20);
 
   function handleQuantityChange(newQty: number) {
+    setErrorMsg(null);
     startTransition(async () => {
-      await updateBasketItemQuantityAction(product.id, newQty);
+      const summary = await updateBasketItemQuantityAction(product.id, newQty);
+      if (summary?.error) {
+        setErrorMsg(summary.error);
+      }
     });
   }
 
   function handleRemove() {
+    setErrorMsg(null);
     startTransition(async () => {
-      await removeBasketItemAction(product.id);
+      const summary = await removeBasketItemAction(product.id);
+      if (summary?.error) {
+        setErrorMsg(summary.error);
+      }
     });
   }
 
@@ -54,6 +63,11 @@ export function BasketItemRow({ item }: BasketItemRowProps) {
           <p className="mt-0.5 text-xs text-gray-500 font-medium">
             {product.unit || "Each"} • £{product.price.toFixed(2)} each
           </p>
+          {errorMsg && (
+            <p role="alert" className="mt-1 text-xs text-red-700 font-medium">
+              {errorMsg}
+            </p>
+          )}
         </div>
       </div>
 

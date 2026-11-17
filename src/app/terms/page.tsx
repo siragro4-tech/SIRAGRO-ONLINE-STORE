@@ -49,10 +49,10 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-bold text-[#323C4B]">4. Delivery &amp; Collection</h2>
             <p className="mt-2">
-              We deliver within a maximum 5.0-mile radius from our store at 147 North Hyde Road, Hayes UB3 4NS.
-              Delivery charges and minimum order values are calculated by zone at checkout based on road distance.
-              Same-day delivery is available for orders confirmed prior to 6:00pm.
-              Free in-store Click &amp; Collect is available during our standard opening hours (7:00am – 10:00pm daily).
+              We deliver within a maximum 5-mile radius from our store at 147 North Hyde Road, Hayes UB3 4NS.
+              Delivery eligibility and charges are evaluated at checkout using straight-line postcode distance from UB3 4NS.
+              Free delivery applies within 1 mile for orders strictly over £25; home delivery charges for other qualifying distances apply once confirmed in store settings.
+              Store collection is available during our standard opening hours (7:00am – 10:00pm daily).
             </p>
           </section>
 

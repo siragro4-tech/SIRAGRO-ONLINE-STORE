@@ -38,6 +38,16 @@ export default async function BasketPage() {
         </p>
       </div>
 
+      {summary.error && (
+        <div
+          role="alert"
+          className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+        >
+          <p className="font-bold">Basket Configuration Notice</p>
+          <p className="mt-1 text-xs leading-relaxed">{summary.error}</p>
+        </div>
+      )}
+
       {summary.items.length === 0 ? (
         /* Empty Basket State */
         <div className="mt-12 rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center max-w-xl mx-auto bg-slate-50/50">

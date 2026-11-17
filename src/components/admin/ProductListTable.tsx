@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Database } from "@/types/database.types";
 import {
   quickUpdateStockAction,
@@ -20,56 +21,79 @@ type CategoryOption = Database["public"]["Tables"]["categories"]["Row"];
 interface ProductListTableProps {
   products: ProductRow[];
   categories: CategoryOption[];
-  initialFilter?: string;
+  counts: {
+    all: number;
+    in_stock: number;
+    low_stock: number;
+    out_of_stock: number;
+    inactive: number;
+    age_restricted: number;
+  };
+  totalMatching: number;
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  initialFilter: string;
+  initialCategory: string;
+  initialSearch: string;
+  initialSort: string;
+  loadError?: string | null;
 }
 
 export function ProductListTable({
   products,
   categories,
-  initialFilter = "all",
+  counts,
+  totalMatching,
+  currentPage,
+  totalPages,
+  pageSize,
+  initialFilter,
+  initialCategory,
+  initialSearch,
+  initialSort,
+  loadError = null,
 }: ProductListTableProps) {
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [filterTab, setFilterTab] = useState(initialFilter);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const router = useRouter();
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [feedback, setFeedback] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  // Optimistic stock edits
+  // Optimistic inline stock editing
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [stockInputVal, setStockInputVal] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
-  // Filter products locally for instantaneous filtering
-  const filteredProducts = products.filter((p) => {
-    // Search query
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      const matchName = p.name.toLowerCase().includes(q);
-      const matchBrand = p.brand?.toLowerCase().includes(q);
-      const matchBarcode = p.barcode?.toLowerCase().includes(q);
-      if (!matchName && !matchBrand && !matchBarcode) return false;
-    }
+  function buildUrl(overrides: {
+    page?: number;
+    filter?: string;
+    category?: string;
+    search?: string;
+    sort?: string;
+  }) {
+    const params = new URLSearchParams();
+    const p = overrides.page ?? currentPage;
+    const f = overrides.filter ?? initialFilter;
+    const c = overrides.category ?? initialCategory;
+    const q = overrides.search !== undefined ? overrides.search : initialSearch;
+    const s = overrides.sort ?? initialSort;
 
-    // Category filter
-    if (selectedCategory !== "all" && p.category_id !== selectedCategory) {
-      return false;
-    }
+    if (p > 1) params.set("page", String(p));
+    if (f && f !== "all") params.set("filter", f);
+    if (c && c !== "all") params.set("category", c);
+    if (q.trim()) params.set("search", q.trim());
+    if (s && s !== "newest") params.set("sort", s);
 
-    // Tab filter
-    if (filterTab === "low_stock") {
-      return p.stock_quantity > 0 && p.stock_quantity <= 10;
-    }
-    if (filterTab === "out_of_stock") {
-      return p.stock_quantity <= 0;
-    }
-    if (filterTab === "in_stock") {
-      return p.stock_quantity > 10;
-    }
-    if (filterTab === "age_restricted") {
-      return p.is_age_restricted;
-    }
+    const qs = params.toString();
+    return qs ? `/admin/products?${qs}` : "/admin/products";
+  }
 
-    return true;
-  });
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    router.push(buildUrl({ search: searchInput, page: 1 }));
+  }
 
   function startEditingStock(p: ProductRow) {
     setEditingStockId(p.id);
@@ -79,7 +103,10 @@ export function ProductListTable({
   function handleSaveStock(productId: string) {
     const val = parseInt(stockInputVal, 10);
     if (isNaN(val) || val < 0) {
-      setFeedback({ type: "error", text: "Please enter a valid stock quantity (0 or greater)" });
+      setFeedback({
+        type: "error",
+        text: "Please enter a valid stock quantity (0 or greater).",
+      });
       return;
     }
 
@@ -88,8 +115,12 @@ export function ProductListTable({
       setEditingStockId(null);
       if (res.success) {
         setFeedback({ type: "success", text: "Inventory stock level updated." });
+        router.refresh();
       } else {
-        setFeedback({ type: "error", text: res.error || "Failed to update stock" });
+        setFeedback({
+          type: "error",
+          text: res.error || "Failed to update stock.",
+        });
       }
     });
   }
@@ -100,10 +131,14 @@ export function ProductListTable({
       if (res.success) {
         setFeedback({
           type: "success",
-          text: `Product "${p.name}" is now ${p.is_available ? "hidden" : "active in store"}.`,
+          text: `Product "${p.name}" is now ${p.is_available ? "archived (hidden)" : "active in store"}.`,
         });
+        router.refresh();
       } else {
-        setFeedback({ type: "error", text: res.error || "Could not update status" });
+        setFeedback({
+          type: "error",
+          text: res.error || "Could not update product status.",
+        });
       }
     });
   }
@@ -111,7 +146,7 @@ export function ProductListTable({
   function handleDelete(p: ProductRow) {
     if (
       !confirm(
-        `Are you sure you want to delete product "${p.name}"? This action cannot be undone.`
+        `Remove or archive "${p.name}"?\n\nIf this product has past customer orders, it will be safely archived (hidden from store) to protect order history.`
       )
     ) {
       return;
@@ -120,59 +155,49 @@ export function ProductListTable({
     startTransition(async () => {
       const res = await deleteProductAction(p.id);
       if (res.success) {
-        setFeedback({ type: "success", text: `Product "${p.name}" deleted.` });
+        setFeedback({
+          type: "success",
+          text: res.message || `Product "${p.name}" updated.`,
+        });
+        router.refresh();
       } else {
-        setFeedback({ type: "error", text: res.error || "Could not delete product" });
+        setFeedback({
+          type: "error",
+          text: res.error || "Could not delete or archive product.",
+        });
       }
     });
   }
 
+  const fromItem = totalMatching === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const toItem = Math.min(currentPage * pageSize, totalMatching);
+
   return (
     <div className="space-y-6">
-      {/* Top action header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#323C4B] sm:text-3xl">
             Product Catalogue
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage inventory levels, pricing, off-licence tags, and store availability.
+          <p className="mt-1 text-sm text-slate-600">
+            Search, sort, paginate, edit images, and manage inventory across your full store catalogue.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/admin/import"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-[#323C4B] hover:bg-slate-50 transition-colors shadow-2xs"
           >
-            <svg
-              className="h-4 w-4 text-gray-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-              />
-            </svg>
             Bulk CSV Import
           </Link>
 
           <Link
             href="/admin/products/new"
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:opacity-90"
-            style={{ backgroundColor: "var(--color-primary)" }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#323C4B] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#242c37] transition-colors"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Add New Product
@@ -180,54 +205,53 @@ export function ProductListTable({
         </div>
       </div>
 
-      {/* Global alert feedback */}
+      {/* Explicit Load Error Banner */}
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <strong>Unable to load products from database:</strong> {loadError}
+        </div>
+      )}
+
+      {/* Action Feedback */}
       {feedback && (
         <div
-          className={`rounded-lg p-4 text-sm font-medium ${
+          className={`rounded-xl border p-4 text-sm font-semibold ${
             feedback.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
+              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+              : "bg-red-50 text-red-800 border-red-200"
           }`}
         >
           {feedback.text}
         </div>
       )}
 
-      {/* Search, Filter & Tabs bar */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-                />
-              </svg>
-            </span>
+      {/* Server-Side Search, Category, Sort & Tabs */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs space-y-4">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 items-center">
+          <form onSubmit={handleSearchSubmit} className="lg:col-span-5 flex gap-2">
             <input
               type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search product name, brand, barcode..."
-              className="w-full rounded-lg border border-gray-300 pl-9 pr-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:ring-1 focus:ring-green-600"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search name, brand, or barcode..."
+              className="flex-1 rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             />
-          </div>
+            <button
+              type="submit"
+              className="rounded-xl bg-[#323C4B] px-4 py-2 text-xs font-bold text-white hover:bg-[#242c37]"
+            >
+              Search
+            </button>
+          </form>
 
-          {/* Category Dropdown Filter */}
-          <div className="w-full sm:w-64">
+          <div className="lg:col-span-3">
             <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:ring-1 focus:ring-green-600"
+              aria-label="Filter by category"
+              value={initialCategory}
+              onChange={(e) =>
+                router.push(buildUrl({ category: e.target.value, page: 1 }))
+              }
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
             >
               <option value="all">All Aisles &amp; Categories</option>
               {categories.map((c) => (
@@ -237,91 +261,95 @@ export function ProductListTable({
               ))}
             </select>
           </div>
+
+          <div className="lg:col-span-3">
+            <select
+              aria-label="Sort products"
+              value={initialSort}
+              onChange={(e) =>
+                router.push(buildUrl({ sort: e.target.value, page: 1 }))
+              }
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
+            >
+              <option value="newest">Sort: Newest Added</option>
+              <option value="name_asc">Sort: Name (A–Z)</option>
+              <option value="price_asc">Sort: Price (Low to High)</option>
+              <option value="price_desc">Sort: Price (High to Low)</option>
+              <option value="stock_asc">Sort: Lowest Stock First</option>
+              <option value="stock_desc">Sort: Highest Stock First</option>
+            </select>
+          </div>
+
+          <div className="lg:col-span-1 flex justify-end">
+            <Link
+              href="/admin/products"
+              className="text-xs font-bold text-slate-500 hover:text-[#323C4B] hover:underline"
+            >
+              Reset
+            </Link>
+          </div>
         </div>
 
-        {/* Tab pills */}
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+        {/* Status Tabs */}
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
           {[
-            { id: "all", label: `All Products (${products.length})` },
-            {
-              id: "in_stock",
-              label: `In Stock (${products.filter((p) => p.stock_quantity > 10).length})`,
-            },
-            {
-              id: "low_stock",
-              label: `Low Stock (${products.filter((p) => p.stock_quantity > 0 && p.stock_quantity <= 10).length})`,
-            },
-            {
-              id: "out_of_stock",
-              label: `Out of Stock (${products.filter((p) => p.stock_quantity <= 0).length})`,
-            },
-            {
-              id: "age_restricted",
-              label: `Challenge 25 (${products.filter((p) => p.is_age_restricted).length})`,
-            },
+            { id: "all", label: `All (${counts.all})` },
+            { id: "in_stock", label: `In Stock (${counts.in_stock})` },
+            { id: "low_stock", label: `Low Stock (${counts.low_stock})` },
+            { id: "out_of_stock", label: `Out of Stock (${counts.out_of_stock})` },
+            { id: "inactive", label: `Archived/Hidden (${counts.inactive})` },
+            { id: "age_restricted", label: `Challenge 25 (${counts.age_restricted})` },
           ].map((tab) => (
-            <button
+            <Link
               key={tab.id}
-              type="button"
-              onClick={() => setFilterTab(tab.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                filterTab === tab.id
-                  ? "bg-green-700 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              href={buildUrl({ filter: tab.id, page: 1 })}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                initialFilter === tab.id
+                  ? "bg-[#323C4B] text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
               {tab.label}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xs">
+      {/* Products Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th scope="col" className="px-4 py-3.5">
-                  Product
-                </th>
-                <th scope="col" className="px-4 py-3.5">
-                  Category
-                </th>
-                <th scope="col" className="px-4 py-3.5">
-                  Price
-                </th>
-                <th scope="col" className="px-4 py-3.5">
-                  Stock Units
-                </th>
-                <th scope="col" className="px-4 py-3.5">
-                  Status
-                </th>
-                <th scope="col" className="px-4 py-3.5 text-right">
-                  Actions
-                </th>
+                <th scope="col" className="px-4 py-3.5">Product</th>
+                <th scope="col" className="px-4 py-3.5">Category</th>
+                <th scope="col" className="px-4 py-3.5">Price</th>
+                <th scope="col" className="px-4 py-3.5">Stock Units</th>
+                <th scope="col" className="px-4 py-3.5">Status</th>
+                <th scope="col" className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredProducts.length === 0 ? (
+            <tbody className="divide-y divide-slate-200">
+              {products.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     No products matched your search or filters.
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((prod) => {
+                products.map((prod) => {
                   const imgPath = prod.images?.find((i) => i.is_primary)?.storage_path;
                   const displayImg = getProductImageUrl(imgPath);
-                  const isLow = prod.stock_quantity > 0 && prod.stock_quantity <= 10;
+                  const threshold = prod.low_stock_threshold ?? 10;
+                  const isLow =
+                    prod.stock_quantity > 0 && prod.stock_quantity <= threshold;
                   const isOut = prod.stock_quantity <= 0;
 
                   return (
-                    <tr key={prod.id} className="hover:bg-gray-50 transition-colors">
-                      {/* Product Name & Image */}
+                    <tr key={prod.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={displayImg}
@@ -330,13 +358,17 @@ export function ProductListTable({
                             />
                           </div>
                           <div>
-                            <div className="font-semibold text-gray-900 line-clamp-1">
+                            <div className="font-bold text-slate-900 line-clamp-1">
                               {prod.name}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                               <span>{prod.brand || "SIRAGRO"}</span>
                               {prod.unit && <span>&bull; {prod.unit}</span>}
-                              {prod.barcode && <span className="font-mono text-gray-400">#{prod.barcode}</span>}
+                              {prod.barcode && (
+                                <span className="font-mono text-slate-400">
+                                  #{prod.barcode}
+                                </span>
+                              )}
                             </div>
                             {prod.is_age_restricted && (
                               <span className="mt-0.5 inline-flex items-center rounded-sm bg-red-100 px-1.5 py-0.2 text-[10px] font-bold text-red-800">
@@ -347,24 +379,21 @@ export function ProductListTable({
                         </div>
                       </td>
 
-                      {/* Category */}
-                      <td className="px-4 py-3.5 text-gray-600 text-xs font-medium">
+                      <td className="px-4 py-3.5 text-slate-600 text-xs font-medium">
                         {prod.category?.name || "Uncategorised"}
                       </td>
 
-                      {/* Price */}
                       <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="font-bold text-gray-900">
-                          £{prod.price.toFixed(2)}
+                        <span className="font-bold text-slate-900">
+                          £{Number(prod.price).toFixed(2)}
                         </span>
                         {prod.compare_at_price && prod.compare_at_price > prod.price && (
-                          <span className="ml-1.5 text-xs text-gray-400 line-through">
-                            £{prod.compare_at_price.toFixed(2)}
+                          <span className="ml-1.5 text-xs text-slate-400 line-through">
+                            £{Number(prod.compare_at_price).toFixed(2)}
                           </span>
                         )}
                       </td>
 
-                      {/* Stock with quick inline editor */}
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         {editingStockId === prod.id ? (
                           <div className="flex items-center gap-1.5">
@@ -373,19 +402,19 @@ export function ProductListTable({
                               min="0"
                               value={stockInputVal}
                               onChange={(e) => setStockInputVal(e.target.value)}
-                              className="w-16 rounded border border-gray-300 px-1.5 py-0.5 text-xs font-semibold focus:border-green-600 focus:ring-1 focus:ring-green-600"
+                              className="w-16 rounded border border-slate-300 px-1.5 py-0.5 text-xs font-semibold focus:border-[#323C4B] focus:ring-1 focus:ring-[#323C4B]"
                             />
                             <button
                               type="button"
                               onClick={() => handleSaveStock(prod.id)}
-                              className="rounded bg-green-700 px-2 py-0.5 text-xs font-bold text-white hover:bg-green-800"
+                              className="rounded bg-[#323C4B] px-2 py-0.5 text-xs font-bold text-white hover:bg-[#242c37]"
                             >
                               ✓
                             </button>
                             <button
                               type="button"
                               onClick={() => setEditingStockId(null)}
-                              className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-700 hover:bg-gray-300"
+                              className="rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-300"
                             >
                               ✕
                             </button>
@@ -393,12 +422,12 @@ export function ProductListTable({
                         ) : (
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
                                 isOut
                                   ? "bg-red-100 text-red-800"
                                   : isLow
                                   ? "bg-amber-100 text-amber-800"
-                                  : "bg-green-100 text-green-800"
+                                  : "bg-emerald-100 text-emerald-800"
                               }`}
                             >
                               {prod.stock_quantity} in stock
@@ -406,49 +435,38 @@ export function ProductListTable({
                             <button
                               type="button"
                               onClick={() => startEditingStock(prod)}
-                              className="text-gray-400 hover:text-gray-700"
+                              className="text-slate-400 hover:text-[#323C4B]"
                               title="Quick edit stock"
+                              aria-label={`Edit stock for ${prod.name}`}
                             >
-                              <svg
-                                className="h-3.5 w-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                strokeWidth={2}
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"
-                                />
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                               </svg>
                             </button>
                           </div>
                         )}
                       </td>
 
-                      {/* Status */}
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(prod)}
                           disabled={isPending}
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold transition-colors ${
                             prod.is_available
-                              ? "bg-green-100 text-green-800 hover:bg-green-200"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-slate-200 text-slate-600 hover:bg-slate-300"
                           }`}
                           title="Click to toggle store visibility"
                         >
-                          {prod.is_available ? "Active" : "Hidden"}
+                          {prod.is_available ? "Active" : "Archived"}
                         </button>
                       </td>
 
-                      {/* Actions */}
                       <td className="px-4 py-3.5 text-right whitespace-nowrap space-x-2">
                         <Link
                           href={`/admin/products/${prod.id}/edit`}
-                          className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-[#323C4B] hover:bg-slate-100 transition-colors"
                         >
                           Edit
                         </Link>
@@ -456,9 +474,9 @@ export function ProductListTable({
                           type="button"
                           onClick={() => handleDelete(prod)}
                           disabled={isPending}
-                          className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                          className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
                         >
-                          Delete
+                          Remove
                         </button>
                       </td>
                     </tr>
@@ -468,8 +486,50 @@ export function ProductListTable({
             </tbody>
           </table>
         </div>
+
+        {/* Server-Side Pagination Bar */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs text-slate-500">
+            Showing <span className="font-bold text-slate-900">{fromItem}</span> to{" "}
+            <span className="font-bold text-slate-900">{toItem}</span> of{" "}
+            <span className="font-bold text-slate-900">{totalMatching}</span> matching product(s)
+          </p>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              {currentPage > 1 ? (
+                <Link
+                  href={buildUrl({ page: currentPage - 1 })}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-[#323C4B] hover:bg-slate-100"
+                >
+                  &larr; Previous
+                </Link>
+              ) : (
+                <span className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                  &larr; Previous
+                </span>
+              )}
+
+              <span className="text-xs font-semibold text-slate-700">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              {currentPage < totalPages ? (
+                <Link
+                  href={buildUrl({ page: currentPage + 1 })}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-[#323C4B] hover:bg-slate-100"
+                >
+                  Next &rarr;
+                </Link>
+              ) : (
+                <span className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-400">
+                  Next &rarr;
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-

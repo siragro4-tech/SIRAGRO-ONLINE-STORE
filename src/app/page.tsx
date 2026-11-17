@@ -224,33 +224,47 @@ export default async function HomePage() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border-2 border-[#323C4B] bg-white shadow-xl crazy-card scroll-pop">
-            <div className="grid grid-cols-4 bg-[#323C4B] text-white text-xs sm:text-sm font-bold py-4 px-5">
-              <div>Zone</div>
-              <div>Radius</div>
-              <div>Delivery Fee</div>
-              <div>Min Order</div>
+            <div className="grid grid-cols-3 bg-[#323C4B] text-white text-xs sm:text-sm font-bold py-4 px-5">
+              <div>Service</div>
+              <div>Distance from UB3 4NS</div>
+              <div>Pricing &amp; Availability</div>
             </div>
             {[
-              { zone: "Zone 1 (Immediate)", dist: "Up to 1 mile", fee: "FREE over £25", min: "£15" },
-              { zone: "Zone 2 (Local)",     dist: "1 – 3 miles",  fee: "£3.99",          min: "£15" },
-              { zone: "Zone 3 (Extended)",  dist: "3 – 5 miles",  fee: "£4.99",          min: "£20" },
-              { zone: "Click & Collect",    dist: "In Store",     fee: "FREE Always",    min: "None" },
+              {
+                zone: "Local Delivery (Up to 1 mile)",
+                dist: "Within 1 mile",
+                fee: "FREE on orders strictly over £25",
+              },
+              {
+                zone: "Local Delivery (1 – 5 miles)",
+                dist: "1 – 5 miles",
+                fee: "Delivery charge applies (calculated at checkout once confirmed)",
+              },
+              {
+                zone: "Beyond 5 miles",
+                dist: "Over 5 miles",
+                fee: "Home delivery unavailable",
+              },
+              {
+                zone: "Click & Collect",
+                dist: "In Store (UB3 4NS)",
+                fee: "Store collection available (Free)",
+              },
             ].map((row, idx) => (
               <div
                 key={row.zone}
-                className={`grid grid-cols-4 items-center text-xs sm:text-sm py-4 px-5 ${
+                className={`grid grid-cols-3 items-center gap-3 text-xs sm:text-sm py-4 px-5 ${
                   idx % 2 === 0 ? "bg-white" : "bg-[#f8fafc]"
                 } border-t border-slate-200 transition-colors hover:bg-slate-100`}
               >
                 <div className="font-bold text-[#323C4B]">{row.zone}</div>
                 <div className="text-slate-600">{row.dist}</div>
-                <div className="font-black text-[#323C4B]">{row.fee}</div>
-                <div className="text-slate-600">{row.min}</div>
+                <div className="font-bold text-[#323C4B]">{row.fee}</div>
               </div>
             ))}
           </div>
           <p className="mt-4 text-center text-xs text-slate-500">
-            Postcode verified at checkout using distance from UB3 4NS. Same-day delivery on orders placed before 6pm.
+            Postcode verified at checkout using straight-line distance from UB3 4NS. Home delivery checkout opens once all store delivery fees are confirmed.
           </p>
         </div>
       </section>

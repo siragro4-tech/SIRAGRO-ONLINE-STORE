@@ -1,180 +1,219 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { FALLBACK_PRODUCTS, FALLBACK_CATEGORIES } from "@/lib/products";
+import { requireAdminPage } from "@/lib/admin-auth";
+import {
+  calculateRevenueSummary,
+  classifyStockStatus,
+  type SalesPeriod,
+} from "@/lib/admin-rules";
+import {
+  AdminActivityFeed,
+  type ActivityEventItem,
+} from "@/components/admin/AdminActivityFeed";
 
 export const metadata: Metadata = {
   title: "Dashboard Overview",
 };
 
-export default async function AdminDashboardPage() {
-  const supabase = await createServerSupabaseClient();
+interface AdminDashboardPageProps {
+  searchParams: Promise<{ period?: string }>;
+}
 
-  // Product and inventory counts
-  let totalProducts = FALLBACK_PRODUCTS.length;
-  let lowStockCount = FALLBACK_PRODUCTS.filter((p) => p.stock_quantity <= 10).length;
-  let categoriesCount = FALLBACK_CATEGORIES.length;
-  let ordersCount = 0;
-  let activeFulfillmentCount = 0;
+const PERIOD_LABELS: Record<SalesPeriod, string> = {
+  today: "Today (UK)",
+  "7d": "Last 7 Days",
+  month: "This Month",
+  all: "All Time",
+};
 
-  // Sales metrics state
-  let grossPaidRevenue: number | null = null;
-  let totalPaidOrders: number | null = null;
-  let averageOrderValue: number | null = null;
-  let todayPaidRevenue: number | null = null;
-  let todayPaidOrders: number | null = null;
-  let monthPaidRevenue: number | null = null;
-  let monthPaidOrders: number | null = null;
-  let salesErrorMessage: string | null = null;
-
-  try {
-    // 1. Catalog & Category Counts
-    const { count: prodCount } = await supabase
-      .from("products")
-      .select("*", { count: "exact", head: true });
-    if (prodCount !== null && prodCount !== undefined) {
-      totalProducts = prodCount;
-    }
-
-    const { count: catCount } = await supabase
-      .from("categories")
-      .select("*", { count: "exact", head: true });
-    if (catCount !== null && catCount !== undefined) {
-      categoriesCount = catCount;
-    }
-
-    const { data: lowStock } = await supabase
-      .from("products")
-      .select("id")
-      .lte("stock_quantity", 10);
-    if (lowStock) {
-      lowStockCount = lowStock.length;
-    }
-
-    // 2. Orders Fulfillment Counts
-    const { count: ordCount, data: orders } = await supabase
-      .from("orders")
-      .select("id, status");
-    if (ordCount !== null && ordCount !== undefined) {
-      ordersCount = ordCount;
-    }
-    if (orders) {
-      activeFulfillmentCount = orders.filter((o) =>
-        ["pending", "processing", "ready_for_pickup", "out_for_delivery"].includes(o.status)
-      ).length;
-    }
-
-    // 3. Accurate Sales Performance Metrics (Paid Orders Only)
-    // First, attempt optimized RPC aggregation function
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "get_sales_metrics"
-    );
-
-    if (!rpcError && rpcData) {
-      grossPaidRevenue = Number(rpcData.total_paid_revenue || 0);
-      totalPaidOrders = Number(rpcData.total_paid_orders || 0);
-      averageOrderValue = Number(rpcData.average_order_value || 0);
-      todayPaidRevenue = Number(rpcData.today_paid_revenue || 0);
-      todayPaidOrders = Number(rpcData.today_paid_orders || 0);
-      monthPaidRevenue = Number(rpcData.month_paid_revenue || 0);
-      monthPaidOrders = Number(rpcData.month_paid_orders || 0);
-    } else {
-      // Direct query fallback: lightweight select of total & created_at for paid orders only
-      const { data: paidOrders, error: paidErr } = await supabase
-        .from("orders")
-        .select("total, created_at")
-        .eq("payment_status", "paid");
-
-      if (paidErr) {
-        console.error("[Admin Dashboard] Failed to fetch paid orders:", paidErr);
-        salesErrorMessage = paidErr.message;
-      } else if (paidOrders) {
-        const now = new Date();
-        const londonToday = new Intl.DateTimeFormat("en-CA", {
-          timeZone: "Europe/London",
-        }).format(now);
-        const londonMonth = londonToday.slice(0, 7);
-
-        let gross = 0;
-        let todayRev = 0;
-        let todayCount = 0;
-        let monthRev = 0;
-        let monthCount = 0;
-
-        for (const o of paidOrders) {
-          const tot = Number(o.total || 0);
-          gross += tot;
-
-          const orderDay = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Europe/London",
-          }).format(new Date(o.created_at));
-
-          if (orderDay === londonToday) {
-            todayRev += tot;
-            todayCount += 1;
-          }
-          if (orderDay.startsWith(londonMonth)) {
-            monthRev += tot;
-            monthCount += 1;
-          }
-        }
-
-        grossPaidRevenue = Math.round(gross * 100) / 100;
-        totalPaidOrders = paidOrders.length;
-        averageOrderValue =
-          paidOrders.length > 0 ? Math.round((gross / paidOrders.length) * 100) / 100 : 0;
-        todayPaidRevenue = Math.round(todayRev * 100) / 100;
-        todayPaidOrders = todayCount;
-        monthPaidRevenue = Math.round(monthRev * 100) / 100;
-        monthPaidOrders = monthCount;
-      }
-    }
-  } catch (err: unknown) {
-    salesErrorMessage = err instanceof Error ? err.message : "Database connection issue";
+function parsePeriod(raw?: string): SalesPeriod {
+  if (raw === "today" || raw === "7d" || raw === "month" || raw === "all") {
+    return raw;
   }
+  return "month";
+}
+
+function getLondonDateKey(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/London",
+  }).format(date);
+}
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: AdminDashboardPageProps) {
+  const { period: rawPeriod } = await searchParams;
+  const selectedPeriod = parsePeriod(rawPeriod);
+
+  const { supabase } = await requireAdminPage("/admin");
+
+  // Query errors tracked explicitly — never mask failures as zero
+  const queryErrors: string[] = [];
+
+  // 1. Fetch Orders for Sales & Operational Metrics
+  const { data: allOrders, error: ordersErr } = await supabase
+    .from("orders")
+    .select(
+      "id, order_number, status, fulfilment_type, customer_name, total, payment_status, created_at"
+    )
+    .order("created_at", { ascending: false });
+
+  if (ordersErr) {
+    queryErrors.push(`Orders query failed: ${ordersErr.message}`);
+  }
+
+  // Also check if migration 004 refunded_amount exists safely
+  let refundMap: Record<string, number> = {};
+  if (!ordersErr && allOrders && allOrders.length > 0) {
+    const { data: refundRows } = await supabase
+      .from("orders")
+      .select("id, refunded_amount");
+    if (refundRows) {
+      refundMap = Object.fromEntries(
+        refundRows.map((r) => [r.id, Number(r.refunded_amount || 0)])
+      );
+    }
+  }
+
+  // 2. Fetch Product Stock Snapshot (lightweight columns only for 1,500+ scale)
+  const { data: allProducts, error: productsErr } = await supabase
+    .from("products")
+    .select("id, name, stock_quantity, is_available, is_age_restricted");
+
+  if (productsErr) {
+    queryErrors.push(`Products query failed: ${productsErr.message}`);
+  }
+
+  // 3. Fetch Categories count
+  const { count: categoriesCount, error: catErr } = await supabase
+    .from("categories")
+    .select("id", { count: "exact", head: true });
+
+  if (catErr) {
+    queryErrors.push(`Categories query failed: ${catErr.message}`);
+  }
+
+  // 4. Fetch Delivery Settings (live DB values, never invented)
+  const { data: deliverySettings, error: deliverySettingsErr } = await supabase
+    .from("delivery_settings")
+    .select("*")
+    .limit(1)
+    .maybeSingle();
+
+  if (deliverySettingsErr) {
+    queryErrors.push(`Delivery settings query failed: ${deliverySettingsErr.message}`);
+  }
+
+  // 5. Fetch Activity Events & Cart Aggregates (graceful if migration 004 pending)
+  let activityEvents: ActivityEventItem[] = [];
+  let activityPendingMigration = false;
+  const { data: eventsData, error: eventsErr } = await supabase
+    .from("admin_activity_events")
+    .select(
+      "id, event_type, severity, title, summary, order_id, product_id, is_read, created_at"
+    )
+    .order("created_at", { ascending: false })
+    .limit(15);
+
+  if (eventsErr) {
+    if (
+      eventsErr.message.includes("does not exist") ||
+      eventsErr.message.includes("schema cache")
+    ) {
+      activityPendingMigration = true;
+    }
+  } else if (eventsData) {
+    activityEvents = eventsData as ActivityEventItem[];
+  }
+
+  const todayLondon = getLondonDateKey(new Date());
+  let topCartToday: Array<{
+    id: string;
+    product_id: string;
+    product_name_snapshot: string;
+    add_count: number;
+    total_units_added: number;
+  }> = [];
+
+  if (!activityPendingMigration) {
+    const { data: cartRows } = await supabase
+      .from("cart_activity_daily")
+      .select("id, product_id, product_name_snapshot, add_count, total_units_added")
+      .eq("activity_date", todayLondon)
+      .order("total_units_added", { ascending: false })
+      .limit(5);
+    if (cartRows) topCartToday = cartRows;
+  }
+
+  // 6. Fetch Unread Contact Enquiries Count (from contact_messages table)
+  let newContactCount = 0;
+  const { count: contactCount } = await supabase
+    .from("contact_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "new");
+  newContactCount = contactCount ?? 0;
+
+  // Compute Revenue & Operational Metrics
+  const enrichedOrders = (allOrders || []).map((o) => ({
+    ...o,
+    refunded_amount: refundMap[o.id] ?? 0,
+  }));
+
+  const revenueSummary = !ordersErr
+    ? calculateRevenueSummary(enrichedOrders, selectedPeriod)
+    : null;
+  const todaySummary = !ordersErr
+    ? calculateRevenueSummary(enrichedOrders, "today")
+    : null;
+
+  const ordersTodayTotal = !ordersErr
+    ? (allOrders || []).filter(
+        (o) => getLondonDateKey(new Date(o.created_at)) === todayLondon
+      ).length
+    : null;
+
+  const awaitingFulfilmentCount = !ordersErr
+    ? (allOrders || []).filter((o) =>
+        ["pending", "processing", "ready_for_pickup", "out_for_delivery"].includes(
+          o.status
+        )
+      ).length
+    : null;
+
+  const lowStockProducts = (allProducts || []).filter(
+    (p) => classifyStockStatus(p.stock_quantity) === "low_stock"
+  );
+  const outOfStockProducts = (allProducts || []).filter(
+    (p) => classifyStockStatus(p.stock_quantity) === "out_of_stock"
+  );
+
+  const recentOrders = (allOrders || []).slice(0, 6);
 
   return (
     <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-5">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+          <h1 className="text-2xl font-extrabold tracking-tight text-[#323C4B] sm:text-3xl">
             Store Overview &amp; Control Centre
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Real-time management for SIRAGRO Supermarket &amp; Off-Licence (Hayes Hub: UB3 4NS).
+          <p className="mt-1 text-sm text-slate-600">
+            SIRAGRO Supermarket &amp; Off-Licence • 147 North Hyde Road, Hayes, UB3 4NS
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/admin/orders"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-[#323C4B] hover:bg-slate-50 transition-colors shadow-2xs"
           >
-            <svg
-              className="h-4 w-4 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
             Orders Queue
           </Link>
-
           <Link
             href="/admin/products/new"
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-xs transition-colors hover:opacity-90"
-            style={{ backgroundColor: "#323C4B" }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#323C4B] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#242c37] transition-colors"
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Add Product
@@ -182,325 +221,534 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Database Error Banner for Sales Metrics */}
-      {salesErrorMessage && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <div className="flex items-center gap-2">
-            <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-            </svg>
-            <span className="font-bold">Sales Metrics Unavailable</span>
-          </div>
-          <p className="mt-1 text-xs text-red-700">
-            Could not query verified sales data from database: {salesErrorMessage}.
+      {/* Explicit Database Query Error Banner (Never disguise errors as zeros) */}
+      {queryErrors.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900"
+        >
+          <p className="font-bold">Some store metrics could not be loaded:</p>
+          <ul className="mt-1 list-disc pl-5 text-xs space-y-0.5 text-red-800">
+            {queryErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Migration Notice (if 004 hasn't been applied yet) */}
+      {activityPendingMigration && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
+          <p className="font-bold text-sm">Activity &amp; Inventory Migration Pending</p>
+          <p className="mt-1">
+            To enable the live in-dashboard notification feed, privacy-safe basket metrics, and inventory adjustment history, apply{" "}
+            <code className="font-mono font-semibold">
+              supabase/migrations/004_admin_activity_and_inventory.sql
+            </code>{" "}
+            in your Supabase SQL Editor.
           </p>
         </div>
       )}
 
-      {/* Section 1: Financial & Sales Performance (Paid Orders Only) */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-gray-700">
-              Verified Sales Performance
+      {/* Section 1: Verified Paid Sales & Period Filter */}
+      <section aria-labelledby="sales-heading" className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2
+              id="sales-heading"
+              className="text-sm font-extrabold uppercase tracking-wider text-[#323C4B]"
+            >
+              Verified Sales Performance ({PERIOD_LABELS[selectedPeriod]})
             </h2>
-          </div>
-          <span className="text-xs text-gray-500">
-            Source of Truth: Stripe Webhook • Gross Paid (excl. unverified/unpaid)
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Gross Paid Revenue Card */}
-          <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-800">
-                Gross Paid Revenue
-              </span>
-              <span className="rounded-lg bg-emerald-100 p-2 text-emerald-800">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6H2.25m0 0H3m0 0h18m0 0h.75A.75.75 0 0122.5 6v.75m0 0h-.75m0 0H3m18 0v11.25m0 0h.75a.75.75 0 00.75-.75V6m-1.5 11.25H3m0 0H2.25a.75.75 0 01-.75-.75V6" />
-                </svg>
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 font-mono">
-                {grossPaidRevenue !== null ? `£${grossPaidRevenue.toFixed(2)}` : "—"}
-              </span>
-              <span className="text-xs text-gray-500 font-medium">all-time</span>
-            </div>
-            <div className="mt-3 text-xs text-emerald-700 font-medium">
-              From {totalPaidOrders ?? 0} paid order{(totalPaidOrders ?? 0) !== 1 ? "s" : ""}
-            </div>
+            <p className="text-xs text-slate-500">
+              Calculated strictly from Stripe-verified paid orders. Unpaid &amp; failed attempts are excluded.
+            </p>
           </div>
 
-          {/* Today's Paid Sales Card */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Today&apos;s Paid Sales
-              </span>
-              <span className="rounded-lg bg-blue-50 p-2 text-blue-700">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 font-mono">
-                {todayPaidRevenue !== null ? `£${todayPaidRevenue.toFixed(2)}` : "—"}
-              </span>
-              <span className="text-xs text-gray-500 font-medium">UK today</span>
-            </div>
-            <div className="mt-3 text-xs text-blue-700 font-medium">
-              {todayPaidOrders ?? 0} paid order{(todayPaidOrders ?? 0) !== 1 ? "s" : ""} today
-            </div>
-          </div>
-
-          {/* Month-to-Date Paid Sales Card */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                This Month (MTD)
-              </span>
-              <span className="rounded-lg bg-purple-50 p-2 text-purple-700">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 9v7.5" />
-                </svg>
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 font-mono">
-                {monthPaidRevenue !== null ? `£${monthPaidRevenue.toFixed(2)}` : "—"}
-              </span>
-              <span className="text-xs text-gray-500 font-medium">current month</span>
-            </div>
-            <div className="mt-3 text-xs text-purple-700 font-medium">
-              {monthPaidOrders ?? 0} paid order{(monthPaidOrders ?? 0) !== 1 ? "s" : ""}
-            </div>
-          </div>
-
-          {/* Average Order Value (AOV) Card */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Average Order Value
-              </span>
-              <span className="rounded-lg bg-amber-50 p-2 text-amber-700">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                </svg>
-              </span>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900 font-mono">
-                {averageOrderValue !== null ? `£${averageOrderValue.toFixed(2)}` : "—"}
-              </span>
-              <span className="text-xs text-gray-500 font-medium">AOV</span>
-            </div>
-            <div className="mt-3 text-xs text-amber-700 font-medium">
-              Across verified payments
-            </div>
+          {/* Period Selector Pills */}
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Select sales period">
+            {(["today", "7d", "month", "all"] as SalesPeriod[]).map((p) => (
+              <Link
+                key={p}
+                href={`/admin?period=${p}`}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                  selectedPeriod === p
+                    ? "bg-[#323C4B] text-white shadow-xs"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {PERIOD_LABELS[p]}
+              </Link>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* Section 2: Store & Operations Metrics Grid */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex h-2.5 w-2.5 rounded-full bg-blue-500" />
-          <h2 className="text-sm font-bold uppercase tracking-wider text-gray-700">
-            Catalog &amp; Operations Overview
-          </h2>
-        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Revenue Card */}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-xs">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+              {revenueSummary?.hasRecordedRefunds
+                ? "Net Paid Revenue"
+                : "Gross Paid Sales (Before Refunds)"}
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {revenueSummary
+                ? `£${(revenueSummary.hasRecordedRefunds
+                    ? revenueSummary.netPaidRevenue
+                    : revenueSummary.grossPaidRevenue
+                  ).toFixed(2)}`
+                : "Error"}
+            </div>
+            <p className="mt-2 text-xs text-emerald-800 font-medium">
+              {revenueSummary
+                ? revenueSummary.hasRecordedRefunds
+                  ? `Gross £${revenueSummary.grossPaidRevenue.toFixed(2)} − Refunds £${revenueSummary.refundedTotal.toFixed(2)}`
+                  : `${revenueSummary.paidOrderCount} verified paid order${revenueSummary.paidOrderCount !== 1 ? "s" : ""}`
+                : "Unable to compute"}
+            </p>
+          </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Orders Queue Card */}
+          {/* Average Order Value */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Average Order Value
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {revenueSummary ? `£${revenueSummary.averageOrderValue.toFixed(2)}` : "Error"}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {revenueSummary
+                ? `Across ${revenueSummary.paidOrderCount} paid order(s)`
+                : "Unable to compute"}
+            </p>
+          </div>
+
+          {/* Orders Today */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Orders Today (UK)
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {ordersTodayTotal !== null ? ordersTodayTotal : "Error"}
+            </div>
+            <p className="mt-2 text-xs text-slate-600">
+              {todaySummary
+                ? `${todaySummary.paidOrderCount} paid (£${todaySummary.grossPaidRevenue.toFixed(2)})`
+                : "Query error"}
+              {todaySummary && todaySummary.awaitingPaymentCount > 0
+                ? ` • ${todaySummary.awaitingPaymentCount} unpaid`
+                : ""}
+            </p>
+          </div>
+
+          {/* Awaiting Fulfilment */}
           <Link
-            href="/admin/orders"
-            className="group rounded-xl border border-gray-200 bg-white p-5 shadow-xs transition-all hover:border-green-600 hover:shadow-sm"
+            href="/admin/orders?status=processing"
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition-all hover:border-[#323C4B] hover:shadow-sm"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Customer Orders
-              </span>
-              <span className="rounded-lg bg-blue-50 p-2 text-blue-700 group-hover:bg-blue-100 transition-colors">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z" />
-                </svg>
-              </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Awaiting Fulfilment
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-[#323C4B]">
+              {awaitingFulfilmentCount !== null ? awaitingFulfilmentCount : "Error"}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900">{ordersCount}</span>
-              {activeFulfillmentCount > 0 && (
-                <span className="text-xs font-semibold text-blue-700">
-                  ({activeFulfillmentCount} active)
-                </span>
-              )}
-            </div>
-            <div className="mt-3 text-xs font-medium text-blue-700">View orders queue &rarr;</div>
+            <p className="mt-2 text-xs font-semibold text-[#323C4B]">
+              Open active queue &rarr;
+            </p>
           </Link>
+        </div>
+      </section>
 
-          {/* Products Card */}
+      {/* Section 2: Catalogue & Inventory Health */}
+      <section aria-labelledby="inventory-heading" className="space-y-4">
+        <h2
+          id="inventory-heading"
+          className="text-sm font-extrabold uppercase tracking-wider text-[#323C4B]"
+        >
+          Catalogue &amp; Inventory Health
+        </h2>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Link
             href="/admin/products"
-            className="group rounded-xl border border-gray-200 bg-white p-5 shadow-xs transition-all hover:border-green-600 hover:shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-[#323C4B] transition-all"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Total Products
-              </span>
-              <span className="rounded-lg bg-green-50 p-2 text-green-700 group-hover:bg-green-100 transition-colors">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                </svg>
-              </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Total Products
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {!productsErr ? (allProducts || []).length : "Error"}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900">{totalProducts}</span>
-              <span className="text-xs text-gray-500">in catalog</span>
-            </div>
-            <div className="mt-3 text-xs font-medium text-green-700">Manage catalog &rarr;</div>
+            <p className="mt-2 text-xs font-semibold text-[#323C4B]">
+              Manage catalogue &rarr;
+            </p>
           </Link>
 
-          {/* Low Stock Card */}
           <Link
             href="/admin/products?filter=low_stock"
-            className={`group rounded-xl border p-5 shadow-xs transition-all hover:shadow-sm ${
-              lowStockCount > 0
+            className={`rounded-2xl border p-5 shadow-xs transition-all ${
+              lowStockProducts.length > 0
                 ? "border-amber-200 bg-amber-50/40 hover:border-amber-400"
-                : "border-gray-200 bg-white hover:border-gray-300"
+                : "border-slate-200 bg-white hover:border-[#323C4B]"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Low Stock Alerts
-              </span>
-              <span className="rounded-lg bg-amber-100 p-2 text-amber-700">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                </svg>
-              </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+              Low Stock Alerts
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {!productsErr ? lowStockProducts.length : "Error"}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900">{lowStockCount}</span>
-              <span className="text-xs text-amber-700 font-medium">items ≤ 10 units</span>
-            </div>
-            <div className="mt-3 text-xs font-medium text-amber-800">Review inventory &rarr;</div>
+            <p className="mt-2 text-xs font-semibold text-amber-800">
+              1–10 units remaining &rarr;
+            </p>
           </Link>
 
-          {/* Categories Card */}
+          <Link
+            href="/admin/products?filter=out_of_stock"
+            className={`rounded-2xl border p-5 shadow-xs transition-all ${
+              outOfStockProducts.length > 0
+                ? "border-red-200 bg-red-50/50 hover:border-red-400"
+                : "border-slate-200 bg-white hover:border-[#323C4B]"
+            }`}
+          >
+            <span className="text-xs font-bold uppercase tracking-wider text-red-800">
+              Out of Stock
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {!productsErr ? outOfStockProducts.length : "Error"}
+            </div>
+            <p className="mt-2 text-xs font-semibold text-red-700">
+              0 units available &rarr;
+            </p>
+          </Link>
+
           <Link
             href="/admin/categories"
-            className="group rounded-xl border border-gray-200 bg-white p-5 shadow-xs transition-all hover:border-green-600 hover:shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:border-[#323C4B] transition-all"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Aisles &amp; Categories
-              </span>
-              <span className="rounded-lg bg-purple-50 p-2 text-purple-700 group-hover:bg-purple-100 transition-colors">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-                </svg>
-              </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Categories &amp; Aisles
+            </span>
+            <div className="mt-2 font-mono text-3xl font-black text-slate-900">
+              {!catErr ? categoriesCount ?? 0 : "Error"}
             </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-gray-900">{categoriesCount}</span>
-              <span className="text-xs text-gray-500">active aisles</span>
-            </div>
-            <div className="mt-3 text-xs font-medium text-purple-700">Manage aisles &rarr;</div>
+            <p className="mt-2 text-xs font-semibold text-[#323C4B]">
+              Organise aisles &rarr;
+            </p>
           </Link>
+        </div>
+      </section>
+
+      {/* Section 3: Activity Feed + Aggregate Basket & Stock Alerts */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        {/* Notifications & Activity Stream */}
+        <div className="xl:col-span-2 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-[#323C4B]">
+              Store Notifications &amp; Activity
+            </h2>
+            <Link
+              href="/admin/activity"
+              className="text-xs font-bold text-[#323C4B] hover:underline"
+            >
+              Open full activity log &rarr;
+            </Link>
+          </div>
+          <AdminActivityFeed events={activityEvents} showFilters={true} />
+        </div>
+
+        {/* Right Side: Privacy-Safe Basket Demand & Urgent Stock Alerts */}
+        <div className="space-y-6">
+          {/* Aggregate Cart Activity Today */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-[#323C4B]">
+                  Today&apos;s Cart Demand (Aggregate)
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  No visitor PII • Does not reserve stock
+                </p>
+              </div>
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-800">
+                Server-verified
+              </span>
+            </div>
+
+            {topCartToday.length === 0 ? (
+              <p className="mt-4 text-xs text-slate-500">
+                No cart additions logged today yet.
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y divide-slate-100 text-xs">
+                {topCartToday.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between py-2.5 gap-2">
+                    <Link
+                      href={`/admin/products/${c.product_id}/edit`}
+                      className="font-semibold text-slate-800 hover:text-[#323C4B] hover:underline truncate"
+                    >
+                      {c.product_name_snapshot}
+                    </Link>
+                    <span className="shrink-0 font-mono text-slate-600">
+                      {c.total_units_added} units ({c.add_count}×)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Low / Out of Stock Products List */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-[#323C4B]">
+                Stock Attention Needed
+              </h3>
+              <Link
+                href="/admin/products?filter=low_stock"
+                className="text-xs font-bold text-[#323C4B] hover:underline"
+              >
+                View all
+              </Link>
+            </div>
+
+            {productsErr ? (
+              <p className="mt-4 text-xs text-red-700 font-medium">
+                Unavailable — could not verify product stock ({productsErr.message}).
+              </p>
+            ) : outOfStockProducts.length === 0 && lowStockProducts.length === 0 ? (
+              <p className="mt-4 text-xs text-emerald-700 font-medium">
+                All products are well stocked (above 10 units).
+              </p>
+            ) : (
+              <ul className="mt-3 divide-y divide-slate-100 text-xs">
+                {[...outOfStockProducts, ...lowStockProducts]
+                  .slice(0, 6)
+                  .map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex items-center justify-between py-2.5 gap-2"
+                    >
+                      <Link
+                        href={`/admin/products/${p.id}/edit`}
+                        className="font-medium text-slate-800 hover:underline truncate"
+                      >
+                        {p.name}
+                      </Link>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          p.stock_quantity <= 0
+                            ? "bg-red-100 text-red-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {p.stock_quantity} left
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
+
+          {/* New Customer Enquiries Card */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-[#323C4B]">
+                  Customer Enquiries
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {newContactCount} unread message{newContactCount !== 1 ? "s" : ""} from Contact Us
+                </p>
+              </div>
+              <Link
+                href="/admin/activity#enquiries"
+                className="rounded-lg bg-[#323C4B] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#242c37]"
+              >
+                View
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Operational Highlights */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Hub & Delivery Status Card */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-xs">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100 text-green-800">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                </svg>
-              </span>
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">
-                  Hayes Physical Hub &amp; Delivery Engine
-                </h2>
-                <p className="text-xs text-gray-500">Store Postcode: UB3 4NS (Hayes, Middlesex)</p>
-              </div>
-            </div>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
-              Live &amp; Enforcing
-            </span>
-          </div>
-
-          <dl className="mt-4 divide-y divide-gray-100 text-sm">
-            <div className="flex justify-between py-2.5">
-              <dt className="text-gray-500">Store Pickup / Collection</dt>
-              <dd className="font-semibold text-green-700">Free (£0.00)</dd>
-            </div>
-            <div className="flex justify-between py-2.5">
-              <dt className="text-gray-500">0 - 1.0 Mile Delivery</dt>
-              <dd className="font-semibold text-gray-900">Free over £25 (otherwise £2.49)</dd>
-            </div>
-            <div className="flex justify-between py-2.5">
-              <dt className="text-gray-500">1.0 - 3.0 Miles Delivery</dt>
-              <dd className="font-semibold text-gray-900">£3.99 flat</dd>
-            </div>
-            <div className="flex justify-between py-2.5">
-              <dt className="text-gray-500">3.0 - 5.0 Miles Delivery</dt>
-              <dd className="font-semibold text-gray-900">£4.99 flat</dd>
-            </div>
-            <div className="flex justify-between py-2.5">
-              <dt className="text-gray-500">Beyond 5.0 Miles</dt>
-              <dd className="font-semibold text-gray-500">Collection Only</dd>
-            </div>
-          </dl>
+      {/* Section 4: Recent Orders Snapshot */}
+      <section aria-labelledby="recent-orders-heading" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2
+            id="recent-orders-heading"
+            className="text-sm font-extrabold uppercase tracking-wider text-[#323C4B]"
+          >
+            Recent Customer Orders
+          </h2>
+          <Link
+            href="/admin/orders"
+            className="text-xs font-bold text-[#323C4B] hover:underline"
+          >
+            View all orders &rarr;
+          </Link>
         </div>
 
-        {/* Regulatory & Challenge 25 Status */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-xs">
-          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-red-800">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" />
-                </svg>
-              </span>
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">
-                  Off-Licence &amp; Challenge 25
-                </h2>
-                <p className="text-xs text-gray-500">Licensing Act 2003 Compliance</p>
-              </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Order Ref</th>
+                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Method</th>
+                  <th className="px-4 py-3">Payment</th>
+                  <th className="px-4 py-3">Fulfilment</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
+                      No orders have been placed yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recentOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-[#323C4B]">
+                        {order.order_number}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-800">
+                        {order.customer_name}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600 capitalize">
+                        {order.fulfilment_type}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            order.payment_status === "paid"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : order.payment_status === "refunded"
+                              ? "bg-orange-100 text-orange-800"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {order.payment_status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-700 capitalize">
+                        {order.status.replace(/_/g, " ")}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs font-bold text-slate-900">
+                        £{Number(order.total).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/admin/orders/${order.id}`}
+                          className="text-xs font-bold text-[#323C4B] hover:underline"
+                        >
+                          Inspect &rarr;
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 5: Verified Store Configuration & Licensing */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-[#323C4B]">
+                Hayes Physical Hub &amp; Delivery Rules
+              </h2>
+              <p className="text-xs text-slate-500">
+                147 North Hyde Road, Hayes, UB3 4NS • 020 8813 6458
+              </p>
             </div>
-            <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+            <Link
+              href="/admin/settings"
+              className="text-xs font-bold text-[#323C4B] hover:underline"
+            >
+              Manage &rarr;
+            </Link>
+          </div>
+          {deliverySettingsErr || !deliverySettings ? (
+            <p className="mt-4 text-xs font-medium text-red-700">
+              Delivery and collection settings could not be verified. Checkout fails closed until settings are readable.
+            </p>
+          ) : (
+            <dl className="mt-4 divide-y divide-slate-100 text-xs">
+              <div className="flex justify-between py-2">
+                <dt className="text-slate-500">Store Collection</dt>
+                <dd
+                  className={`font-semibold ${
+                    deliverySettings.is_collection_enabled
+                      ? "text-emerald-700"
+                      : "text-red-700"
+                  }`}
+                >
+                  {deliverySettings.is_collection_enabled
+                    ? "Enabled (Free £0.00)"
+                    : "Paused"}
+                </dd>
+              </div>
+              <div className="flex justify-between py-2">
+                <dt className="text-slate-500">Home Delivery</dt>
+                <dd
+                  className={`font-semibold ${
+                    deliverySettings.is_delivery_enabled &&
+                    (deliverySettings as { is_delivery_pricing_confirmed?: boolean })
+                      .is_delivery_pricing_confirmed === true
+                      ? "text-emerald-700"
+                      : "text-amber-800"
+                  }`}
+                >
+                  {(deliverySettings as { is_delivery_pricing_confirmed?: boolean })
+                    .is_delivery_pricing_confirmed !== true
+                    ? "Blocked — Pricing Not Confirmed"
+                    : deliverySettings.is_delivery_enabled
+                      ? `Enabled (up to ${deliverySettings.max_delivery_radius_miles} miles)`
+                      : "Paused by admin"}
+                </dd>
+              </div>
+              <div className="flex justify-between py-2">
+                <dt className="text-slate-500">Free Local Delivery</dt>
+                <dd className="font-semibold text-slate-900">
+                  Within {deliverySettings.free_delivery_radius_miles} mi strictly over £
+                  {Number(deliverySettings.free_delivery_min_subtotal).toFixed(2)}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-red-200 bg-white p-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-red-100 pb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Off-Licence &amp; Challenge 25
+              </h2>
+              <p className="text-xs text-slate-500">Licensing Act 2003 Compliance</p>
+            </div>
+            <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-bold text-red-800">
               Mandatory ID
             </span>
           </div>
-
-          <div className="mt-4 space-y-3 text-sm text-gray-600">
-            <p>
-              Any basket containing age-restricted alcoholic beverages automatically triggers
-              customer age verification notices at checkout.
-            </p>
-            <div className="rounded-lg bg-red-50 p-3 text-xs text-red-800">
-              <strong className="font-bold">Driver Notice:</strong> Delivery drivers and
-              collection staff must inspect official photo ID (Passport, UK Driving Licence,
-              PASS card) for anyone who appears under 25 years old.
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Link
-                href="/admin/products?filter=age_restricted"
-                className="text-xs font-semibold text-green-700 hover:underline"
-              >
-                View all age-restricted products &rarr;
-              </Link>
-            </div>
+          <p className="mt-4 text-xs text-slate-600 leading-relaxed">
+            Age-restricted products automatically trigger age declaration at checkout and require photo ID inspection upon delivery or counter collection.
+          </p>
+          <div className="mt-4 flex justify-end">
+            <Link
+              href="/admin/products?filter=age_restricted"
+              className="text-xs font-bold text-[#323C4B] hover:underline"
+            >
+              Review age-restricted products &rarr;
+            </Link>
           </div>
         </div>
       </div>

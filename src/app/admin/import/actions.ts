@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireAdminAction } from "@/lib/admin-auth";
 import { csvToObjects } from "@/lib/csv";
+import { recordInventoryAdjustment } from "@/lib/activity";
 
 export interface ImportRowError {
   row: number;
@@ -15,6 +16,7 @@ export interface ImportResult {
   totalParsed: number;
   importedCount: number;
   updatedCount: number;
+  skippedCount: number;
   errors: ImportRowError[];
   message?: string;
 }
@@ -23,23 +25,22 @@ export interface ImportResult {
  * Server Action: Parses, validates, and batch imports/upserts products from CSV.
  */
 export async function importProductsCsvAction(
-  csvText: string
+  csvText: string,
+  duplicateMode: "update" | "skip" = "update"
 ): Promise<ImportResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
     return {
       success: false,
       totalParsed: 0,
       importedCount: 0,
       updatedCount: 0,
-      errors: [{ row: 0, name: "Auth", error: "Authentication required" }],
+      skippedCount: 0,
+      errors: [{ row: 0, name: "Auth", error: auth.error }],
     };
   }
 
+  const { profile, supabase } = auth;
   const { rows } = csvToObjects(csvText);
 
   if (rows.length === 0) {
@@ -48,19 +49,34 @@ export async function importProductsCsvAction(
       totalParsed: 0,
       importedCount: 0,
       updatedCount: 0,
+      skippedCount: 0,
       errors: [{ row: 0, name: "File", error: "No product rows found in CSV." }],
     };
   }
 
   // Fetch all existing categories for mapping
-  const { data: dbCategories } = await supabase
+  const { data: dbCategories, error: catErr } = await supabase
     .from("categories")
     .select("id, name, slug");
-  const categoriesList = dbCategories || [];
 
+  if (catErr) {
+    return {
+      success: false,
+      totalParsed: rows.length,
+      importedCount: 0,
+      updatedCount: 0,
+      skippedCount: 0,
+      errors: [
+        { row: 0, name: "Database", error: `Failed to load categories: ${catErr.message}` },
+      ],
+    };
+  }
+
+  const categoriesList = dbCategories || [];
   const errors: ImportRowError[] = [];
   let importedCount = 0;
   let updatedCount = 0;
+  let skippedCount = 0;
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -76,22 +92,39 @@ export async function importProductsCsvAction(
       continue;
     }
 
-    const priceRaw = (row.price || "").replace(/[^0-9.]/g, "");
-    const price = parseFloat(priceRaw);
-    if (isNaN(price) || price < 0) {
+    const priceRaw = (row.price || "").trim();
+    const cleanedPrice = priceRaw.replace(/[^0-9.-]/g, "");
+    const price = parseFloat(cleanedPrice);
+    if (!priceRaw || isNaN(price) || price < 0) {
       errors.push({
         row: rowNumber,
         name,
-        error: `Invalid price "${row.price}" - must be a positive number`,
+        error: `Invalid price "${row.price || ""}" — must be 0 or greater`,
       });
       continue;
     }
 
-    const compareAtRaw = (row.compare_at_price || row.rrp || "").replace(/[^0-9.]/g, "");
+    const compareAtRaw = (row.compare_at_price || row.rrp || "").replace(/[^0-9.-]/g, "");
     const compareAtPrice = compareAtRaw ? parseFloat(compareAtRaw) : null;
+    if (compareAtPrice !== null && (isNaN(compareAtPrice) || compareAtPrice < 0)) {
+      errors.push({
+        row: rowNumber,
+        name,
+        error: `Invalid compare_at_price "${row.compare_at_price}"`,
+      });
+      continue;
+    }
 
-    const stockRaw = (row.stock_quantity || row.stock || "0").replace(/[^0-9]/g, "");
-    const stockQuantity = parseInt(stockRaw, 10) || 0;
+    const stockRaw = (row.stock_quantity || row.stock || "0").trim();
+    const stockQuantity = parseInt(stockRaw, 10);
+    if (isNaN(stockQuantity) || stockQuantity < 0) {
+      errors.push({
+        row: rowNumber,
+        name,
+        error: `Invalid stock_quantity "${row.stock_quantity}" — must be a whole number >= 0`,
+      });
+      continue;
+    }
 
     let slug = (row.slug || "").trim().toLowerCase();
     if (!slug) {
@@ -110,9 +143,15 @@ export async function importProductsCsvAction(
           c.slug.toLowerCase() === categoryIdentifier ||
           c.name.toLowerCase() === categoryIdentifier
       );
-      if (matched) {
-        categoryId = matched.id;
+      if (!matched) {
+        errors.push({
+          row: rowNumber,
+          name,
+          error: `Unknown category "${row.category_slug || row.category}"`,
+        });
+        continue;
       }
+      categoryId = matched.id;
     }
 
     const unit = (row.unit || row.pack_size || "each").trim();
@@ -129,17 +168,33 @@ export async function importProductsCsvAction(
     const isAvailable = !["false", "0", "no", "n"].includes(isAvailableRaw);
 
     const imageUrl = (row.image_url || row.image || "").trim();
+    if (
+      imageUrl &&
+      !imageUrl.startsWith("http://") &&
+      !imageUrl.startsWith("https://") &&
+      !imageUrl.startsWith("/")
+    ) {
+      errors.push({
+        row: rowNumber,
+        name,
+        error: `Invalid image_url "${imageUrl}" — must start with http(s):// or /`,
+      });
+      continue;
+    }
 
     try {
-      // Check if product already exists by slug
       const { data: existing } = await supabase
         .from("products")
-        .select("id")
+        .select("id, stock_quantity")
         .eq("slug", slug)
-        .single();
+        .maybeSingle();
 
       if (existing) {
-        // Update existing product
+        if (duplicateMode === "skip") {
+          skippedCount++;
+          continue;
+        }
+
         const { error: updateErr } = await supabase
           .from("products")
           .update({
@@ -163,21 +218,45 @@ export async function importProductsCsvAction(
           errors.push({ row: rowNumber, name, error: updateErr.message });
         } else {
           updatedCount++;
+
+          if (existing.stock_quantity !== stockQuantity) {
+            await recordInventoryAdjustment({
+              productId: existing.id,
+              productName: name,
+              previousQuantity: existing.stock_quantity,
+              newQuantity: stockQuantity,
+              reason: "csv_import",
+              changedByProfileId: profile.id,
+              changedByEmail: profile.email,
+              notes: "Updated via CSV import",
+            });
+          }
+
           if (imageUrl) {
-            await supabase.from("product_images").upsert(
-              {
+            const { data: primaryImg } = await supabase
+              .from("product_images")
+              .select("id")
+              .eq("product_id", existing.id)
+              .eq("is_primary", true)
+              .maybeSingle();
+
+            if (primaryImg) {
+              await supabase
+                .from("product_images")
+                .update({ storage_path: imageUrl, alt_text: name })
+                .eq("id", primaryImg.id);
+            } else {
+              await supabase.from("product_images").insert({
                 product_id: existing.id,
                 storage_path: imageUrl,
                 alt_text: name,
                 is_primary: true,
                 sort_order: 0,
-              },
-              { onConflict: "product_id" }
-            );
+              });
+            }
           }
         }
       } else {
-        // Insert new product
         const { data: newProd, error: insertErr } = await supabase
           .from("products")
           .insert({
@@ -206,6 +285,18 @@ export async function importProductsCsvAction(
           });
         } else {
           importedCount++;
+
+          await recordInventoryAdjustment({
+            productId: newProd.id,
+            productName: name,
+            previousQuantity: 0,
+            newQuantity: stockQuantity,
+            reason: "csv_import",
+            changedByProfileId: profile.id,
+            changedByEmail: profile.email,
+            notes: "Created via CSV import",
+          });
+
           if (imageUrl) {
             await supabase.from("product_images").insert({
               product_id: newProd.id,
@@ -224,6 +315,7 @@ export async function importProductsCsvAction(
   }
 
   revalidatePath("/admin/products");
+  revalidatePath("/admin");
   revalidatePath("/shop");
   revalidatePath("/");
 
@@ -232,8 +324,8 @@ export async function importProductsCsvAction(
     totalParsed: rows.length,
     importedCount,
     updatedCount,
+    skippedCount,
     errors,
-    message: `Import finished: ${importedCount} created, ${updatedCount} updated, ${errors.length} failed.`,
+    message: `Import finished: ${importedCount} created, ${updatedCount} updated, ${skippedCount} skipped, ${errors.length} failed.`,
   };
 }
-

@@ -17,6 +17,7 @@ export function QuickAddOverlay({
 }: QuickAddOverlayProps) {
   const router = useRouter();
   const [added, setAdded] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   if (isOutOfStock) {
@@ -26,9 +27,16 @@ export function QuickAddOverlay({
   function handleQuickAdd(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
     e.stopPropagation();
+    setErrorMsg(null);
 
     startTransition(async () => {
-      await addBasketItemAction(productId, 1);
+      const summary = await addBasketItemAction(productId, 1);
+      if (summary?.error) {
+        setAdded(false);
+        setErrorMsg("Guest cart unavailable — please sign in");
+        setTimeout(() => setErrorMsg(null), 3000);
+        return;
+      }
       setAdded(true);
       router.refresh();
       setTimeout(() => setAdded(false), 2000);
@@ -38,7 +46,7 @@ export function QuickAddOverlay({
   return (
     <div
       className={`pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-[#323C4B]/70 backdrop-blur-[2px] p-4 transition-all duration-200 ${
-        added || isPending
+        added || isPending || errorMsg
           ? "visible opacity-100"
           : "invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
       }`}
@@ -49,17 +57,21 @@ export function QuickAddOverlay({
         disabled={isPending}
         aria-label={`Add ${productName} to cart`}
         className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-extrabold shadow-lg transition-all active:scale-95 disabled:opacity-75 ${
-          added || isPending
+          added || isPending || errorMsg
             ? "pointer-events-auto"
             : "pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
         } ${
-          added
-            ? "bg-emerald-500 text-white"
-            : "bg-white text-[#323C4B] hover:bg-slate-100"
+          errorMsg
+            ? "bg-red-600 text-white"
+            : added
+              ? "bg-emerald-500 text-white"
+              : "bg-white text-[#323C4B] hover:bg-slate-100"
         }`}
       >
         {isPending ? (
           "Adding..."
+        ) : errorMsg ? (
+          errorMsg
         ) : added ? (
           <>
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

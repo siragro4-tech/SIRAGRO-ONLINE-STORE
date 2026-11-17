@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getProductBySlug, getProducts } from "@/lib/products";
 import { ProductCard, CategoryMockup } from "@/components/products/ProductCard";
 import { AddToBasketSection } from "@/components/products/AddToBasketSection";
+import { getProductImageUrl } from "@/lib/product-image";
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -56,6 +57,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
   const isDiscounted =
     product.compare_at_price && product.compare_at_price > product.price;
+  const primaryImage =
+    product.images?.find((img) => img.is_primary) || product.images?.[0];
+  const uploadedImageUrl = primaryImage?.storage_path
+    ? getProductImageUrl(primaryImage.storage_path)
+    : null;
 
   // JSON-LD Structured Data for search engines
   const jsonLd = {
@@ -123,11 +129,20 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           {/* Left: Product Image / Gallery */}
           <div>
             <div className="relative aspect-square w-full overflow-hidden rounded-2xl border-2 border-slate-200 bg-gray-50 shadow-sm flex items-center justify-center">
-              <CategoryMockup
-                slug={product.category?.slug}
-                brand={product.brand ?? undefined}
-                className="w-full h-full"
-              />
+              {uploadedImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={uploadedImageUrl}
+                  alt={primaryImage?.alt_text || product.name}
+                  className="h-full w-full object-contain p-4"
+                />
+              ) : (
+                <CategoryMockup
+                  slug={product.category?.slug}
+                  brand={product.brand ?? undefined}
+                  className="w-full h-full"
+                />
+              )}
 
               {/* Badges */}
               <div className="absolute left-4 top-4 flex flex-col gap-2 z-10">

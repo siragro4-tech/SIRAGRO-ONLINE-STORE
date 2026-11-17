@@ -37,57 +37,59 @@ export default function DeliveryInfoPage() {
 
             {/* Delivery Zones Table */}
             <div className="bg-white rounded-2xl p-8 border-2 border-slate-200 shadow-sm">
-              <h2 className="text-2xl font-black text-[#323C4B]">Delivery Zones &amp; Pricing</h2>
+              <h2 className="text-2xl font-black text-[#323C4B]">Delivery Coverage &amp; Collection</h2>
               <p className="mt-1 text-xs text-slate-500 mb-6">
-                Delivery fees are calculated based on road distance from our shop anchor (UB3 4NS).
+                Delivery eligibility is currently checked using straight-line distance from our shop postcode (UB3 4NS).
               </p>
 
               <div className="overflow-hidden rounded-xl border-2 border-[#323C4B] bg-white">
-                <div className="grid grid-cols-4 bg-[#323C4B] text-white text-xs sm:text-sm font-bold py-3.5 px-4">
-                  <div>Zone</div>
-                  <div>Radius</div>
-                  <div>Delivery Fee</div>
-                  <div>Min. Order</div>
+                <div className="grid grid-cols-3 bg-[#323C4B] text-white text-xs sm:text-sm font-bold py-3.5 px-4">
+                  <div>Option</div>
+                  <div>Distance from UB3 4NS</div>
+                  <div>Pricing &amp; Availability</div>
                 </div>
 
-                <div className="grid grid-cols-4 items-center text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-white">
+                <div className="grid grid-cols-3 items-center gap-3 text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-white">
                   <div>
-                    <strong className="text-[#323C4B] block">Zone 1</strong>
-                    <span className="text-[11px] text-slate-500">Immediate</span>
+                    <strong className="text-[#323C4B] block">Local Delivery (Up to 1 mile)</strong>
                   </div>
-                  <div className="text-slate-700">Up to 1.0 mile</div>
-                  <div className="font-bold text-emerald-700">FREE over £25<span className="block text-[10px] text-slate-500 font-normal">Otherwise £2.49</span></div>
-                  <div className="text-slate-700">£15.00</div>
-                </div>
-
-                <div className="grid grid-cols-4 items-center text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-[#f8fafc]">
-                  <div>
-                    <strong className="text-[#323C4B] block">Zone 2</strong>
-                    <span className="text-[11px] text-slate-500">Local Area</span>
+                  <div className="text-slate-700">Within 1 mile</div>
+                  <div className="font-bold text-emerald-700">
+                    FREE on orders strictly over £25
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      Charge for orders of £25 or less awaits store confirmation.
+                    </span>
                   </div>
-                  <div className="text-slate-700">1.0 – 3.0 miles</div>
-                  <div className="font-bold text-[#323C4B]">£3.99</div>
-                  <div className="text-slate-700">£15.00</div>
                 </div>
 
-                <div className="grid grid-cols-4 items-center text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-white">
+                <div className="grid grid-cols-3 items-center gap-3 text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-[#f8fafc]">
                   <div>
-                    <strong className="text-[#323C4B] block">Zone 3</strong>
-                    <span className="text-[11px] text-slate-500">Extended</span>
+                    <strong className="text-[#323C4B] block">Local Delivery (1 – 5 miles)</strong>
                   </div>
-                  <div className="text-slate-700">3.0 – 5.0 miles</div>
-                  <div className="font-bold text-[#323C4B]">£4.99</div>
-                  <div className="text-slate-700">£20.00</div>
+                  <div className="text-slate-700">1 – 5 miles</div>
+                  <div className="font-bold text-[#323C4B]">
+                    Delivery charge applies
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      Exact fee awaits store confirmation; home delivery checkout is paused until confirmed.
+                    </span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-4 items-center text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-emerald-50/50">
+                <div className="grid grid-cols-3 items-center gap-3 text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-white">
                   <div>
-                    <strong className="text-emerald-800 block">Click &amp; Collect</strong>
+                    <strong className="text-[#323C4B] block">Outside Delivery Area</strong>
+                  </div>
+                  <div className="text-slate-700">Beyond 5 miles</div>
+                  <div className="font-semibold text-slate-700">Home delivery unavailable</div>
+                </div>
+
+                <div className="grid grid-cols-3 items-center gap-3 text-xs sm:text-sm py-4 px-4 border-t border-slate-200 bg-emerald-50/50">
+                  <div>
+                    <strong className="text-emerald-800 block">Store Collection</strong>
                     <span className="text-[11px] text-emerald-600">Counter Pickup</span>
                   </div>
-                  <div className="text-slate-700">Any Distance</div>
-                  <div className="font-black text-emerald-700">FREE Always</div>
-                  <div className="text-slate-700">No Minimum</div>
+                  <div className="text-slate-700">147 North Hyde Road, UB3 4NS</div>
+                  <div className="font-black text-emerald-700">Available (Free)</div>
                 </div>
               </div>
             </div>

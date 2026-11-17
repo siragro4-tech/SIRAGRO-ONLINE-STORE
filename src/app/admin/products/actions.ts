@@ -1,14 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { uploadProductImage } from "@/lib/supabase/storage";
+import { requireAdminAction } from "@/lib/admin-auth";
+import { validateProductImageFile } from "@/lib/admin-rules";
+import { recordInventoryAdjustment } from "@/lib/activity";
+import {
+  deleteProductImageFromStorage,
+  uploadProductImage,
+} from "@/lib/supabase/storage";
 
 export interface ProductActionResult {
   success: boolean;
   message?: string;
   error?: string;
   productId?: string;
+  archived?: boolean;
 }
 
 /**
@@ -17,14 +23,11 @@ export interface ProductActionResult {
 export async function createProductAction(
   formData: FormData
 ): Promise<ProductActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { profile, supabase } = auth;
 
   const name = String(formData.get("name") || "").trim();
   let slug = String(formData.get("slug") || "").trim().toLowerCase();
@@ -34,9 +37,23 @@ export async function createProductAction(
   const compareAtPriceRaw = String(formData.get("compare_at_price") || "").trim();
   const compareAtPrice = compareAtPriceRaw ? parseFloat(compareAtPriceRaw) : null;
   const unit = String(formData.get("unit") || "").trim() || null;
-  const stockQuantity = parseInt(String(formData.get("stock_quantity") || "0"), 10) || 0;
-  const isAvailable = formData.get("is_available") === "true" || formData.get("is_available") === "on";
-  const isAgeRestricted = formData.get("is_age_restricted") === "true" || formData.get("is_age_restricted") === "on";
+  const stockQuantity = Math.max(
+    0,
+    parseInt(String(formData.get("stock_quantity") || "0"), 10) || 0
+  );
+  const lowStockThresholdRaw = String(
+    formData.get("low_stock_threshold") || "10"
+  ).trim();
+  const lowStockThreshold = Math.max(
+    0,
+    parseInt(lowStockThresholdRaw, 10) || 10
+  );
+  const isAvailable =
+    formData.get("is_available") === "true" ||
+    formData.get("is_available") === "on";
+  const isAgeRestricted =
+    formData.get("is_age_restricted") === "true" ||
+    formData.get("is_age_restricted") === "on";
   const minimumAge = isAgeRestricted
     ? parseInt(String(formData.get("minimum_age") || "18"), 10) || 18
     : null;
@@ -45,7 +62,8 @@ export async function createProductAction(
   const weightKgRaw = String(formData.get("weight_kg") || "").trim();
   const weightKg = weightKgRaw ? parseFloat(weightKgRaw) : null;
   const seoTitle = String(formData.get("seo_title") || "").trim() || null;
-  const seoDescription = String(formData.get("seo_description") || "").trim() || null;
+  const seoDescription =
+    String(formData.get("seo_description") || "").trim() || null;
 
   const imageUrl = String(formData.get("image_url") || "").trim();
   const imageFile = formData.get("image_file") as File | null;
@@ -58,6 +76,32 @@ export async function createProductAction(
     return { success: false, error: "A valid positive price is required" };
   }
 
+  // Validate uploaded file before creating database records
+  let uploadedImagePath: string | null = null;
+  if (imageFile && imageFile.size > 0 && imageFile.name) {
+    const check = validateProductImageFile({
+      name: imageFile.name,
+      type: imageFile.type,
+      size: imageFile.size,
+    });
+    if (!check.valid) {
+      return { success: false, error: check.error };
+    }
+
+    try {
+      const uploadRes = await uploadProductImage(imageFile);
+      uploadedImagePath = uploadRes.storagePath;
+    } catch (uploadErr) {
+      return {
+        success: false,
+        error:
+          uploadErr instanceof Error
+            ? uploadErr.message
+            : "Image upload failed",
+      };
+    }
+  }
+
   if (!slug) {
     slug = name
       .toLowerCase()
@@ -65,8 +109,8 @@ export async function createProductAction(
       .replace(/(^-|-$)+/g, "");
   }
 
-  // Insert product record
-  const { data: newProduct, error } = await supabase
+  // Try insert with low_stock_threshold; fall back gracefully if migration 004 is pending
+  let insertResult = await supabase
     .from("products")
     .insert({
       name,
@@ -77,6 +121,7 @@ export async function createProductAction(
       compare_at_price: compareAtPrice,
       unit,
       stock_quantity: stockQuantity,
+      low_stock_threshold: lowStockThreshold,
       is_available: isAvailable,
       is_age_restricted: isAgeRestricted,
       minimum_age: minimumAge,
@@ -89,7 +134,40 @@ export async function createProductAction(
     .select("id")
     .single();
 
+  if (
+    insertResult.error &&
+    insertResult.error.message.includes("low_stock_threshold")
+  ) {
+    insertResult = await supabase
+      .from("products")
+      .insert({
+        name,
+        slug,
+        category_id: categoryId,
+        description,
+        price,
+        compare_at_price: compareAtPrice,
+        unit,
+        stock_quantity: stockQuantity,
+        is_available: isAvailable,
+        is_age_restricted: isAgeRestricted,
+        minimum_age: minimumAge,
+        barcode,
+        brand,
+        weight_kg: weightKg,
+        seo_title: seoTitle,
+        seo_description: seoDescription,
+      })
+      .select("id")
+      .single();
+  }
+
+  const { data: newProduct, error } = insertResult;
+
   if (error || !newProduct) {
+    if (uploadedImagePath) {
+      await deleteProductImageFromStorage(uploadedImagePath);
+    }
     return {
       success: false,
       error: error?.message.includes("unique")
@@ -98,17 +176,7 @@ export async function createProductAction(
     };
   }
 
-  // Handle image upload or image URL
-  let finalImagePath = imageUrl;
-  if (imageFile && imageFile.size > 0 && imageFile.name) {
-    try {
-      const uploadRes = await uploadProductImage(imageFile);
-      finalImagePath = uploadRes.storagePath;
-    } catch (uploadErr) {
-      console.warn("Storage upload notice (falling back):", uploadErr);
-    }
-  }
-
+  const finalImagePath = uploadedImagePath || imageUrl;
   if (finalImagePath) {
     await supabase.from("product_images").insert({
       product_id: newProduct.id,
@@ -119,9 +187,21 @@ export async function createProductAction(
     });
   }
 
+  await recordInventoryAdjustment({
+    productId: newProduct.id,
+    productName: name,
+    previousQuantity: 0,
+    newQuantity: stockQuantity,
+    lowStockThreshold,
+    reason: "admin_product_create",
+    changedByProfileId: profile.id,
+    changedByEmail: profile.email,
+    notes: "Initial stock upon product creation",
+  });
+
   revalidatePath("/admin/products");
+  revalidatePath("/admin");
   revalidatePath("/shop");
-  revalidatePath(`/category/${categoryId}`);
   revalidatePath("/");
 
   return {
@@ -132,20 +212,17 @@ export async function createProductAction(
 }
 
 /**
- * Updates an existing product and its primary image.
+ * Updates an existing product and manages its primary image (upload, replace, or remove).
  */
 export async function updateProductAction(
   productId: string,
   formData: FormData
 ): Promise<ProductActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { profile, supabase } = auth;
 
   const name = String(formData.get("name") || "").trim();
   let slug = String(formData.get("slug") || "").trim().toLowerCase();
@@ -155,9 +232,23 @@ export async function updateProductAction(
   const compareAtPriceRaw = String(formData.get("compare_at_price") || "").trim();
   const compareAtPrice = compareAtPriceRaw ? parseFloat(compareAtPriceRaw) : null;
   const unit = String(formData.get("unit") || "").trim() || null;
-  const stockQuantity = parseInt(String(formData.get("stock_quantity") || "0"), 10) || 0;
-  const isAvailable = formData.get("is_available") === "true" || formData.get("is_available") === "on";
-  const isAgeRestricted = formData.get("is_age_restricted") === "true" || formData.get("is_age_restricted") === "on";
+  const stockQuantity = Math.max(
+    0,
+    parseInt(String(formData.get("stock_quantity") || "0"), 10) || 0
+  );
+  const lowStockThresholdRaw = String(
+    formData.get("low_stock_threshold") || "10"
+  ).trim();
+  const lowStockThreshold = Math.max(
+    0,
+    parseInt(lowStockThresholdRaw, 10) || 10
+  );
+  const isAvailable =
+    formData.get("is_available") === "true" ||
+    formData.get("is_available") === "on";
+  const isAgeRestricted =
+    formData.get("is_age_restricted") === "true" ||
+    formData.get("is_age_restricted") === "on";
   const minimumAge = isAgeRestricted
     ? parseInt(String(formData.get("minimum_age") || "18"), 10) || 18
     : null;
@@ -166,8 +257,10 @@ export async function updateProductAction(
   const weightKgRaw = String(formData.get("weight_kg") || "").trim();
   const weightKg = weightKgRaw ? parseFloat(weightKgRaw) : null;
   const seoTitle = String(formData.get("seo_title") || "").trim() || null;
-  const seoDescription = String(formData.get("seo_description") || "").trim() || null;
+  const seoDescription =
+    String(formData.get("seo_description") || "").trim() || null;
 
+  const removeImage = formData.get("remove_image") === "true";
   const imageUrl = String(formData.get("image_url") || "").trim();
   const imageFile = formData.get("image_file") as File | null;
 
@@ -179,6 +272,32 @@ export async function updateProductAction(
     return { success: false, error: "A valid positive price is required" };
   }
 
+  // Validate file before mutating database
+  let uploadedImagePath: string | null = null;
+  if (imageFile && imageFile.size > 0 && imageFile.name) {
+    const check = validateProductImageFile({
+      name: imageFile.name,
+      type: imageFile.type,
+      size: imageFile.size,
+    });
+    if (!check.valid) {
+      return { success: false, error: check.error };
+    }
+
+    try {
+      const uploadRes = await uploadProductImage(imageFile);
+      uploadedImagePath = uploadRes.storagePath;
+    } catch (uploadErr) {
+      return {
+        success: false,
+        error:
+          uploadErr instanceof Error
+            ? uploadErr.message
+            : "Image upload failed",
+      };
+    }
+  }
+
   if (!slug) {
     slug = name
       .toLowerCase()
@@ -186,7 +305,13 @@ export async function updateProductAction(
       .replace(/(^-|-$)+/g, "");
   }
 
-  const { error } = await supabase
+  const { data: prevProd } = await supabase
+    .from("products")
+    .select("stock_quantity")
+    .eq("id", productId)
+    .maybeSingle();
+
+  let { error } = await supabase
     .from("products")
     .update({
       name,
@@ -197,6 +322,7 @@ export async function updateProductAction(
       compare_at_price: compareAtPrice,
       unit,
       stock_quantity: stockQuantity,
+      low_stock_threshold: lowStockThreshold,
       is_available: isAvailable,
       is_age_restricted: isAgeRestricted,
       minimum_age: minimumAge,
@@ -209,31 +335,59 @@ export async function updateProductAction(
     })
     .eq("id", productId);
 
+  if (error && error.message.includes("low_stock_threshold")) {
+    const retry = await supabase
+      .from("products")
+      .update({
+        name,
+        slug,
+        category_id: categoryId,
+        description,
+        price,
+        compare_at_price: compareAtPrice,
+        unit,
+        stock_quantity: stockQuantity,
+        is_available: isAvailable,
+        is_age_restricted: isAgeRestricted,
+        minimum_age: minimumAge,
+        barcode,
+        brand,
+        weight_kg: weightKg,
+        seo_title: seoTitle,
+        seo_description: seoDescription,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+    error = retry.error;
+  }
+
   if (error) {
+    if (uploadedImagePath) {
+      await deleteProductImageFromStorage(uploadedImagePath);
+    }
     return { success: false, error: error.message };
   }
 
-  // Handle primary image update if provided
-  let newImagePath = imageUrl;
-  if (imageFile && imageFile.size > 0 && imageFile.name) {
-    try {
-      const uploadRes = await uploadProductImage(imageFile);
-      newImagePath = uploadRes.storagePath;
-    } catch (uploadErr) {
-      console.warn("Storage upload notice (falling back):", uploadErr);
-    }
-  }
+  // Fetch existing primary image
+  const { data: existingImg } = await supabase
+    .from("product_images")
+    .select("id, storage_path")
+    .eq("product_id", productId)
+    .eq("is_primary", true)
+    .maybeSingle();
 
-  if (newImagePath) {
-    // Check if primary image already exists
-    const { data: existingImg } = await supabase
-      .from("product_images")
-      .select("id")
-      .eq("product_id", productId)
-      .eq("is_primary", true)
-      .single();
+  const newImagePath = uploadedImagePath || imageUrl;
 
+  if (removeImage && !newImagePath) {
     if (existingImg) {
+      await deleteProductImageFromStorage(existingImg.storage_path);
+      await supabase.from("product_images").delete().eq("id", existingImg.id);
+    }
+  } else if (newImagePath) {
+    if (existingImg) {
+      if (existingImg.storage_path !== newImagePath) {
+        await deleteProductImageFromStorage(existingImg.storage_path);
+      }
       await supabase
         .from("product_images")
         .update({
@@ -252,7 +406,22 @@ export async function updateProductAction(
     }
   }
 
+  if (prevProd && prevProd.stock_quantity !== stockQuantity) {
+    await recordInventoryAdjustment({
+      productId,
+      productName: name,
+      previousQuantity: prevProd.stock_quantity,
+      newQuantity: stockQuantity,
+      lowStockThreshold,
+      reason: "admin_product_edit",
+      changedByProfileId: profile.id,
+      changedByEmail: profile.email,
+      notes: "Stock updated in product editor",
+    });
+  }
+
   revalidatePath("/admin/products");
+  revalidatePath("/admin");
   revalidatePath(`/admin/products/${productId}/edit`);
   revalidatePath(`/product/${slug}`);
   revalidatePath("/shop");
@@ -272,18 +441,21 @@ export async function quickUpdateStockAction(
   productId: string,
   newStock: number
 ): Promise<ProductActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { profile, supabase } = auth;
 
   if (isNaN(newStock) || newStock < 0) {
     return { success: false, error: "Stock quantity must be 0 or greater" };
   }
+
+  const { data: prevProd } = await supabase
+    .from("products")
+    .select("name, stock_quantity")
+    .eq("id", productId)
+    .maybeSingle();
 
   const { error } = await supabase
     .from("products")
@@ -297,26 +469,37 @@ export async function quickUpdateStockAction(
     return { success: false, error: error.message };
   }
 
+  if (prevProd && prevProd.stock_quantity !== newStock) {
+    await recordInventoryAdjustment({
+      productId,
+      productName: prevProd.name,
+      previousQuantity: prevProd.stock_quantity,
+      newQuantity: newStock,
+      reason: "admin_quick_edit",
+      changedByProfileId: profile.id,
+      changedByEmail: profile.email,
+      notes: "Quick stock count update",
+    });
+  }
+
   revalidatePath("/admin/products");
+  revalidatePath("/admin");
   revalidatePath("/shop");
   return { success: true, message: "Stock updated successfully." };
 }
 
 /**
- * Toggle product availability.
+ * Toggle product availability (active / archived in store).
  */
 export async function toggleProductStatusAction(
   productId: string,
   currentStatus: boolean
 ): Promise<ProductActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { supabase } = auth;
 
   const { error } = await supabase
     .from("products")
@@ -331,23 +514,69 @@ export async function toggleProductStatusAction(
   }
 
   revalidatePath("/admin/products");
+  revalidatePath("/admin");
   revalidatePath("/shop");
   return { success: true, message: "Product status toggled." };
 }
 
 /**
- * Delete a product.
+ * Safely deletes a product OR archives it if referenced in historical orders.
+ * Never destroys historical order relationships.
  */
 export async function deleteProductAction(
   productId: string
 ): Promise<ProductActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+  const { supabase } = auth;
 
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  // Check if product is referenced in any past customer order
+  const { count: orderRefCount, error: refErr } = await supabase
+    .from("order_items")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", productId);
+
+  if (refErr) {
+    return { success: false, error: refErr.message };
+  }
+
+  if (orderRefCount && orderRefCount > 0) {
+    // Archive/deactivate instead of hard-deleting to preserve past order audit records
+    const { error: archiveErr } = await supabase
+      .from("products")
+      .update({
+        is_available: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", productId);
+
+    if (archiveErr) {
+      return { success: false, error: archiveErr.message };
+    }
+
+    revalidatePath("/admin/products");
+    revalidatePath("/admin");
+    revalidatePath("/shop");
+    return {
+      success: true,
+      archived: true,
+      message:
+        "This product appears in past orders, so it was archived (hidden from customers) instead of hard-deleted to preserve order records.",
+    };
+  }
+
+  // Clean up stored product images first
+  const { data: imgs } = await supabase
+    .from("product_images")
+    .select("storage_path")
+    .eq("product_id", productId);
+
+  if (imgs) {
+    for (const img of imgs) {
+      await deleteProductImageFromStorage(img.storage_path);
+    }
   }
 
   const { error } = await supabase
@@ -360,7 +589,7 @@ export async function deleteProductAction(
   }
 
   revalidatePath("/admin/products");
+  revalidatePath("/admin");
   revalidatePath("/shop");
-  return { success: true, message: "Product deleted successfully." };
+  return { success: true, message: "Product deleted permanently." };
 }
-

@@ -1,7 +1,17 @@
 import type Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendOrderConfirmationEmail } from "@/lib/email";
+import {
+  sendOrderConfirmationEmail,
+  sendOwnerOrderNotificationEmail,
+} from "@/lib/email";
+import {
+  isLegacyNotificationConstraintError,
+  resolveNotificationRecord,
+} from "@/lib/email-status";
 import { getStripeClient } from "@/lib/stripe";
+import { validatePaidGbpStripeSession } from "@/lib/stripe-rules";
+import { recordAdminActivity, recordInventoryAdjustment } from "@/lib/activity";
+import type { Json } from "@/types/database.types";
 
 function formatDeliveryAddress(raw: unknown): string | null {
   if (!raw || typeof raw !== "object") return null;
@@ -49,6 +59,31 @@ export async function createOrderFromStripeSession(
     typeof session.payment_intent === "string"
       ? session.payment_intent
       : session.payment_intent?.id || null;
+
+  // Enforce settled GBP payment before persisting or returning a paid order
+  const sessionCheck = validatePaidGbpStripeSession({
+    payment_status: session.payment_status,
+    currency: session.currency,
+    amount_total: session.amount_total,
+  });
+
+  if (!sessionCheck.valid) {
+    console.error(
+      `[Orders] Rejected Stripe session ${sessionId.slice(-8)}: ${sessionCheck.reason}`
+    );
+    await recordAdminActivity({
+      event_type: "order_payment_failed",
+      severity: "error",
+      title: "Rejected Stripe checkout session verification",
+      summary: sessionCheck.reason,
+      metadata: {
+        stripe_session_id: sessionId,
+        currency: session.currency || null,
+        payment_status: session.payment_status,
+      } as Json,
+    });
+    throw new Error(sessionCheck.reason);
+  }
 
   // 1. IDEMPOTENCY CHECK:
   // If an order has already been created for this Stripe checkout session, return it immediately.
@@ -156,39 +191,96 @@ export async function createOrderFromStripeSession(
     .single();
 
   if (orderError || !newOrder) {
+    // Handle concurrent duplicate Stripe webhook retry safely (Postgres 23505 unique_violation)
+    if (orderError?.code === "23505") {
+      const { data: racedOrder } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("stripe_checkout_session_id", sessionId)
+        .maybeSingle();
+
+      if (racedOrder) {
+        const { data: racedItems } = await supabase
+          .from("order_items")
+          .select("*")
+          .eq("order_id", racedOrder.id);
+
+        return {
+          id: racedOrder.id,
+          orderNumber: racedOrder.order_number,
+          customerName: racedOrder.customer_name,
+          customerEmail: racedOrder.customer_email,
+          customerPhone: racedOrder.customer_phone,
+          fulfilmentType: racedOrder.fulfilment_type as "delivery" | "collection",
+          deliveryAddress: formatDeliveryAddress(racedOrder.delivery_address),
+          subtotal: Number(racedOrder.subtotal),
+          deliveryCharge: Number(racedOrder.delivery_charge),
+          total: Number(racedOrder.total),
+          status: racedOrder.status,
+          paymentStatus: racedOrder.payment_status,
+          hasAgeRestrictedItems: false,
+          createdAt: racedOrder.created_at,
+          items: (racedItems || []).map((i) => ({
+            name: i.product_name_snapshot,
+            quantity: i.quantity,
+            unitPrice: Number(i.unit_price_snapshot),
+            lineTotal: Number(i.line_total),
+          })),
+        };
+      }
+    }
+
     console.error("[Orders] Failed to insert order:", orderError);
     return null;
   }
 
   // 5. Insert order items & atomically decrement stock
   for (const item of orderItemsData) {
+    let matchedProd: {
+      id: string;
+      stock_quantity: number;
+      low_stock_threshold?: number;
+    } | null = null;
+
+    try {
+      const { data: prod } = await supabase
+        .from("products")
+        .select("id, stock_quantity")
+        .ilike("name", item.name)
+        .maybeSingle();
+      matchedProd = prod;
+    } catch {
+      // Non-fatal
+    }
+
     await supabase.from("order_items").insert({
       order_id: newOrder.id,
+      product_id: matchedProd?.id || null,
       product_name_snapshot: item.name,
       unit_price_snapshot: item.unitPrice,
       quantity: item.quantity,
       line_total: item.lineTotal,
     });
 
-    // Atomic decrement in database:
-    // UPDATE products SET stock_quantity = GREATEST(0, stock_quantity - quantity)
-    try {
-      const { data: matchedProd } = await supabase
-        .from("products")
-        .select("id, stock_quantity")
-        .ilike("name", item.name)
-        .maybeSingle();
-
-      if (matchedProd) {
+    if (matchedProd) {
+      const nextStock = Math.max(0, matchedProd.stock_quantity - item.quantity);
+      try {
         await supabase
           .from("products")
-          .update({
-            stock_quantity: Math.max(0, matchedProd.stock_quantity - item.quantity),
-          })
+          .update({ stock_quantity: nextStock })
           .eq("id", matchedProd.id);
+
+        await recordInventoryAdjustment({
+          productId: matchedProd.id,
+          productName: item.name,
+          previousQuantity: matchedProd.stock_quantity,
+          newQuantity: nextStock,
+          reason: "order_paid",
+          notes: `Deducted via verified Stripe order #${orderNumber}`,
+        });
+      } catch {
+        // Non-fatal
       }
-    } catch {
-      // Non-fatal if product not in database yet during dev
     }
   }
 
@@ -222,24 +314,87 @@ export async function createOrderFromStripeSession(
     }
   }
 
-  // 8. Send Order Confirmation Email
-  try {
-    await sendOrderConfirmationEmail({
-      orderNumber,
-      customerName,
-      customerEmail,
-      fulfilmentType,
-      deliveryAddress: rawAddress
-        ? `${rawAddress.line1}, ${rawAddress.city}, ${rawAddress.postcode}`
-        : undefined,
-      items: orderItemsData,
-      subtotal,
-      deliveryCharge: deliveryFee,
+  // 8. Record Verified Paid Order in Admin Activity Feed
+  await recordAdminActivity({
+    event_type: "order_paid",
+    severity: "success",
+    title: `Paid Order #${orderNumber} (£${grandTotal.toFixed(2)})`,
+    summary: `Payment confirmed by Stripe webhook • ${fulfilmentType === "delivery" ? "Home Delivery" : "In-Store Collection"
+      } • ${orderItemsData.length} line item(s).`,
+    order_id: newOrder.id,
+    metadata: {
+      order_number: orderNumber,
       total: grandTotal,
-      hasAgeRestrictedItems,
-    });
+      fulfilment_type: fulfilmentType,
+      stripe_session_id: sessionId,
+      stripe_payment_intent_id: paymentIntentId,
+    } as Json,
+  });
+
+  // 9. Send Customer Order Confirmation & Owner Alert Emails
+  const emailPayload = {
+    orderNumber,
+    customerName,
+    customerEmail,
+    fulfilmentType,
+    deliveryAddress: formatDeliveryAddress(rawAddress) || undefined,
+    items: orderItemsData,
+    subtotal,
+    deliveryCharge: deliveryFee,
+    total: grandTotal,
+    hasAgeRestrictedItems,
+  };
+
+  try {
+    const customerEmailResult = await sendOrderConfirmationEmail(emailPayload);
+    const resolved = resolveNotificationRecord(customerEmailResult);
+
+    if (customerEmail) {
+      const { error: notifErr } = await supabase
+        .from("order_notifications")
+        .insert({
+          order_id: newOrder.id,
+          recipient_email: customerEmail,
+          notification_type: "confirmation",
+          status_target: "processing",
+          send_status: resolved.send_status,
+          attempt_count: 1,
+          last_error: resolved.last_error,
+          sent_at: resolved.sent_at,
+        });
+
+      if (
+        notifErr &&
+        resolved.send_status === "not_configured" &&
+        isLegacyNotificationConstraintError(notifErr)
+      ) {
+        await supabase.from("order_notifications").insert({
+          order_id: newOrder.id,
+          recipient_email: customerEmail,
+          notification_type: "confirmation",
+          status_target: "processing",
+          send_status: "failed",
+          attempt_count: 1,
+          last_error:
+            resolved.last_error ||
+            "Email provider not configured — email was not sent.",
+          sent_at: null,
+        });
+      }
+    }
   } catch (emailErr) {
-    console.error("[Orders] Email error:", emailErr);
+    console.error(`[Orders] Customer confirmation email exception for #${orderNumber}:`, emailErr);
+  }
+
+  try {
+    const ownerEmailResult = await sendOwnerOrderNotificationEmail(emailPayload);
+    if (!ownerEmailResult.success) {
+      console.warn(
+        `[Orders] Owner alert email not sent for #${orderNumber}: ${ownerEmailResult.error || "Unknown error"}`
+      );
+    }
+  } catch (ownerEmailErr) {
+    console.error(`[Orders] Owner alert email exception for #${orderNumber}:`, ownerEmailErr);
   }
 
   return {
@@ -306,4 +461,64 @@ export async function getVerifiedOrder(sessionId: string): Promise<OrderRecord |
   // Only verified webhooks may create and mark orders as paid.
   // If the webhook is still in flight, return null so the confirmation page shows a pending state.
   return null;
+}
+
+/**
+ * Updates an order's refund state when Stripe issues a verified charge.refunded webhook.
+ */
+export async function handleStripeChargeRefunded(
+  charge: Stripe.Charge
+): Promise<void> {
+  const paymentIntentId =
+    typeof charge.payment_intent === "string"
+      ? charge.payment_intent
+      : charge.payment_intent?.id || null;
+  if (!paymentIntentId) return;
+
+  const supabase = createAdminClient();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, order_number, total, payment_status")
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .maybeSingle();
+
+  if (!order) return;
+
+  const refundedAmount = Math.min(
+    Number(order.total || 0),
+    Math.round(((charge.amount_refunded || 0) / 100) * 100) / 100
+  );
+
+  // Gracefully update payment_status; set refunded_amount if column exists (migration 004)
+  const { error: withRefundColErr } = await supabase
+    .from("orders")
+    .update({
+      payment_status: "refunded",
+      refunded_amount: refundedAmount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", order.id);
+
+  if (withRefundColErr) {
+    await supabase
+      .from("orders")
+      .update({
+        payment_status: "refunded",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
+  }
+
+  await recordAdminActivity({
+    event_type: "order_refunded",
+    severity: "warning",
+    title: `Order #${order.order_number} Refunded (£${refundedAmount.toFixed(2)})`,
+    summary: `Stripe webhook confirmed a refund of £${refundedAmount.toFixed(2)} for order #${order.order_number}.`,
+    order_id: order.id,
+    metadata: {
+      order_number: order.order_number,
+      refunded_amount: refundedAmount,
+      stripe_payment_intent_id: paymentIntentId,
+    } as Json,
+  });
 }

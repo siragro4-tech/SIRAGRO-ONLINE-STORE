@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { getProductById, getCategories } from "@/lib/products";
 import { ProductForm } from "@/components/admin/ProductForm";
 
@@ -20,6 +21,8 @@ export async function generateMetadata({
 
 export default async function EditProductPage({ params }: EditProductPageProps) {
   const { id } = await params;
+  await requireAdminPage(`/admin/products/${id}/edit`);
+
   const [product, categories] = await Promise.all([
     getProductById(id),
     getCategories(),
@@ -35,4 +38,3 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     </div>
   );
 }
-

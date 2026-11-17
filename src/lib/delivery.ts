@@ -1,13 +1,13 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  evaluateDeliveryRules,
+  evaluateFulfilmentAvailability,
+  type DeliveryCalculationResult,
+  type DeliverySettingsRecord,
+  type FulfilmentAvailability,
+} from "@/lib/delivery-rules";
 
-export type DeliveryCalculationResult = {
-  isEligible: boolean;
-  distanceMiles: number | null;
-  deliveryFee: number;
-  isFreeDelivery: boolean;
-  reason?: string;
-  shopPostcode: string;
-};
+export type { DeliveryCalculationResult, FulfilmentAvailability };
 
 // Store Reference: UB3 4NS (Hayes, Middlesex)
 export const SHOP_COORDINATES = {
@@ -104,17 +104,43 @@ export async function lookupPostcodeCoordinates(
   return null;
 }
 
+async function fetchDeliverySettingsRow(): Promise<{
+  settings: DeliverySettingsRecord | null;
+  settingsError: boolean;
+}> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase
+      .from("delivery_settings")
+      .select("*")
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return { settings: null, settingsError: true };
+    }
+
+    return {
+      settings: data as DeliverySettingsRecord,
+      settingsError: false,
+    };
+  } catch {
+    return { settings: null, settingsError: true };
+  }
+}
+
 /**
- * Evaluates delivery eligibility and calculates delivery fee on the server.
- * 
- * Rules:
- * 1. Fulfilment type 'collection': Free, always eligible regardless of distance.
- * 2. Delivery distance <= 1.0 mile:
- *    - If subtotal > £25.00: FREE delivery.
- *    - If subtotal <= £25.00: Tier 1 delivery charge (£2.99 / configured).
- * 3. Delivery distance 1.0 - 3.0 miles: Tier 1 delivery charge (£3.99).
- * 4. Delivery distance 3.0 - 5.0 miles: Tier 2 delivery charge (£4.99).
- * 5. Delivery distance > 5.0 miles: Not eligible for delivery; collection only.
+ * Returns server-verified availability for home delivery and store collection.
+ */
+export async function getFulfilmentAvailability(): Promise<FulfilmentAvailability> {
+  const { settings, settingsError } = await fetchDeliverySettingsRow();
+  return evaluateFulfilmentAvailability(settings, settingsError);
+}
+
+/**
+ * Evaluates delivery or collection eligibility and fee strictly on the server.
+ * Fails closed when delivery_settings cannot be safely read, a fulfilment toggle
+ * is disabled, or delivery pricing is not explicitly confirmed.
  */
 export async function calculateDeliveryCharge(options: {
   fulfilmentType: "delivery" | "collection";
@@ -122,130 +148,65 @@ export async function calculateDeliveryCharge(options: {
   subtotal: number;
 }): Promise<DeliveryCalculationResult> {
   const { fulfilmentType, postcode, subtotal } = options;
+  const { settings, settingsError } = await fetchDeliverySettingsRow();
 
-  // 1. Collection is always free & eligible
   if (fulfilmentType === "collection") {
-    return {
-      isEligible: true,
+    return evaluateDeliveryRules({
+      fulfilmentType: "collection",
+      postcodeProvided: true,
       distanceMiles: 0,
-      deliveryFee: 0.0,
-      isFreeDelivery: true,
+      subtotal,
+      settings,
+      settingsError,
       shopPostcode: SHOP_COORDINATES.postcode,
-      reason: "In-store collection from our shop near UB3 4NS is free.",
-    };
+    });
   }
 
-  // 2. Delivery requires a valid postcode
-  if (!postcode || !postcode.trim()) {
-    return {
-      isEligible: false,
+  // Check store toggle / confirmation status before calling external postcode APIs
+  const availability = evaluateFulfilmentAvailability(settings, settingsError);
+  if (!availability.deliveryAvailable) {
+    return evaluateDeliveryRules({
+      fulfilmentType: "delivery",
+      postcodeProvided: Boolean(postcode && postcode.trim()),
       distanceMiles: null,
-      deliveryFee: 0.0,
-      isFreeDelivery: false,
+      subtotal,
+      settings,
+      settingsError,
       shopPostcode: SHOP_COORDINATES.postcode,
-      reason: "Please enter your delivery postcode.",
-    };
+    });
   }
 
-  // 3. Fetch delivery settings from database (or fall back to defaults)
-  let settings = {
-    free_delivery_radius_miles: 1.0,
-    free_delivery_min_subtotal: 25.0,
-    max_delivery_radius_miles: 5.0,
-    delivery_fee_tier_1: 3.99,
-    delivery_fee_tier_2: 4.99,
-  };
-
-  try {
-    const supabase = await createServerSupabaseClient();
-    const { data } = await supabase
-      .from("delivery_settings")
-      .select("*")
-      .limit(1)
-      .single();
-
-    if (data) {
-      settings = {
-        free_delivery_radius_miles: Number(data.free_delivery_radius_miles) || 1.0,
-        free_delivery_min_subtotal: Number(data.free_delivery_min_subtotal) || 25.0,
-        max_delivery_radius_miles: Number(data.max_delivery_radius_miles) || 5.0,
-        delivery_fee_tier_1: Number(data.delivery_fee_tier_1) || 3.99,
-        delivery_fee_tier_2: Number(data.delivery_fee_tier_2) || 4.99,
-      };
-    }
-  } catch {
-    // Default settings preserved
-  }
-
-  // 4. Look up customer coordinates
-  const customerCoords = await lookupPostcodeCoordinates(postcode);
-
-  if (!customerCoords) {
-    return {
-      isEligible: false,
+  const trimmedPostcode = postcode?.trim() || "";
+  if (!trimmedPostcode) {
+    return evaluateDeliveryRules({
+      fulfilmentType: "delivery",
+      postcodeProvided: false,
       distanceMiles: null,
-      deliveryFee: 0.0,
-      isFreeDelivery: false,
+      subtotal,
+      settings,
+      settingsError,
       shopPostcode: SHOP_COORDINATES.postcode,
-      reason: "Invalid UK postcode. Please check and try again.",
-    };
+    });
   }
 
-  // 5. Calculate distance
-  const distanceMiles = calculateHaversineDistance(
-    SHOP_COORDINATES.latitude,
-    SHOP_COORDINATES.longitude,
-    customerCoords.latitude,
-    customerCoords.longitude
-  );
+  const customerCoords = await lookupPostcodeCoordinates(trimmedPostcode);
+  const distanceMiles = customerCoords
+    ? calculateHaversineDistance(
+        SHOP_COORDINATES.latitude,
+        SHOP_COORDINATES.longitude,
+        customerCoords.latitude,
+        customerCoords.longitude
+      )
+    : null;
 
-  // 6. Check maximum delivery radius
-  if (distanceMiles > settings.max_delivery_radius_miles) {
-    return {
-      isEligible: false,
-      distanceMiles,
-      deliveryFee: 0.0,
-      isFreeDelivery: false,
-      shopPostcode: SHOP_COORDINATES.postcode,
-      reason: `Your address is ${distanceMiles} miles away, which is beyond our 5-mile delivery boundary. You are very welcome to choose in-store collection!`,
-    };
-  }
-
-  // 7. Check Free Delivery rule: within 1 mile AND subtotal strictly > £25.00
-  if (
-    distanceMiles <= settings.free_delivery_radius_miles &&
-    subtotal > settings.free_delivery_min_subtotal
-  ) {
-    return {
-      isEligible: true,
-      distanceMiles,
-      deliveryFee: 0.0,
-      isFreeDelivery: true,
-      shopPostcode: SHOP_COORDINATES.postcode,
-      reason: `Eligible for Free Delivery! (${distanceMiles} mi from shop near UB3 4NS, subtotal exceeds £25.00)`,
-    };
-  }
-
-  // 8. Distance between 0 - 3.0 miles (including <= 1 mi under £25)
-  if (distanceMiles <= 3.0) {
-    return {
-      isEligible: true,
-      distanceMiles,
-      deliveryFee: settings.delivery_fee_tier_1,
-      isFreeDelivery: false,
-      shopPostcode: SHOP_COORDINATES.postcode,
-      reason: `Delivery charge: £${settings.delivery_fee_tier_1.toFixed(2)} (${distanceMiles} mi from shop). Free delivery on orders over £25 within 1 mile!`,
-    };
-  }
-
-  // 9. Distance between 3.0 - 5.0 miles
-  return {
-    isEligible: true,
+  return evaluateDeliveryRules({
+    fulfilmentType: "delivery",
+    postcodeProvided: true,
     distanceMiles,
-    deliveryFee: settings.delivery_fee_tier_2,
-    isFreeDelivery: false,
+    subtotal,
+    settings,
+    settingsError,
     shopPostcode: SHOP_COORDINATES.postcode,
-    reason: `Delivery charge: £${settings.delivery_fee_tier_2.toFixed(2)} (${distanceMiles} mi from shop near UB3 4NS).`,
-  };
+  });
 }
 

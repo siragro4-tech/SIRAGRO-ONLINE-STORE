@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import type { BasketSummary } from "@/lib/basket";
-import type { DeliveryCalculationResult } from "@/lib/delivery";
+import type {
+  DeliveryCalculationResult,
+  FulfilmentAvailability,
+} from "@/lib/delivery";
 import { validatePostcodeAction, createCheckoutSessionAction } from "@/app/checkout/actions";
 
 interface CheckoutFormProps {
@@ -13,10 +16,23 @@ interface CheckoutFormProps {
     last_name?: string | null;
     phone?: string | null;
   } | null;
+  availability: FulfilmentAvailability;
 }
 
-export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
-  const [fulfilmentType, setFulfilmentType] = useState<"delivery" | "collection">("delivery");
+export function CheckoutForm({
+  summary,
+  initialProfile,
+  availability,
+}: CheckoutFormProps) {
+  const [fulfilmentType, setFulfilmentType] = useState<
+    "delivery" | "collection" | null
+  >(
+    availability.deliveryAvailable
+      ? "delivery"
+      : availability.collectionAvailable
+        ? "collection"
+        : null
+  );
   const [postcode, setPostcode] = useState("");
   const [deliveryResult, setDeliveryResult] = useState<DeliveryCalculationResult | null>(null);
   const [isCheckingPostcode, startPostcodeCheck] = useTransition();
@@ -25,7 +41,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
   const [isSubmitting, startSubmission] = useTransition();
 
   const currentDeliveryFee =
-    fulfilmentType === "collection" ? 0.0 : deliveryResult?.deliveryFee || 0.0;
+    fulfilmentType === "delivery" ? deliveryResult?.deliveryFee || 0.0 : 0.0;
   const totalAmount = summary.subtotal + currentDeliveryFee;
 
   function handleCheckPostcode() {
@@ -44,6 +60,13 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (!fulfilmentType) {
+      setErrorMessage(
+        "Checkout is currently unavailable because no verified fulfilment option is active."
+      );
+      return;
+    }
 
     const formData = new FormData(e.currentTarget);
     formData.set("fulfilmentType", fulfilmentType);
@@ -136,53 +159,88 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Home Delivery Card */}
           <label
-            className={`flex cursor-pointer flex-col rounded-xl border-2 p-4 transition-all ${
-              fulfilmentType === "delivery"
-                ? "border-[#323C4B] bg-[#323C4B]/5 ring-2 ring-[#323C4B]"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
+            className={`flex flex-col rounded-xl border-2 p-4 transition-all ${!availability.deliveryAvailable
+              ? "cursor-not-allowed border-gray-200 bg-gray-100/70 opacity-75"
+              : fulfilmentType === "delivery"
+                ? "cursor-pointer border-[#323C4B] bg-[#323C4B]/5 ring-2 ring-[#323C4B]"
+                : "cursor-pointer border-gray-200 hover:border-gray-300"
+              }`}
           >
             <div className="flex items-center justify-between">
               <span className="font-bold text-gray-900">🚚 Home Delivery</span>
               <input
                 type="radio"
                 name="fulfilmentTypeRadio"
+                disabled={!availability.deliveryAvailable}
                 checked={fulfilmentType === "delivery"}
-                onChange={() => setFulfilmentType("delivery")}
-                className="h-4 w-4 text-[#323C4B] focus:ring-[#323C4B]"
+                onChange={() => {
+                  if (availability.deliveryAvailable) {
+                    setFulfilmentType("delivery");
+                  }
+                }}
+                className="h-4 w-4 text-[#323C4B] focus:ring-[#323C4B] disabled:opacity-50"
               />
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Delivered within 5 miles of our shop near UB3 4NS. Free delivery over £25 within 1 mile.
-            </p>
+            {availability.deliveryAvailable ? (
+              <p className="mt-2 text-xs text-gray-500">
+                Delivered within 5 miles of UB3 4NS. Free over £25 within 1 mile.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs font-medium text-amber-800">
+                {availability.deliveryUnavailableReason ||
+                  "Home delivery is currently unavailable."}
+              </p>
+            )}
           </label>
 
           {/* In-Store Collection Card */}
           <label
-            className={`flex cursor-pointer flex-col rounded-xl border-2 p-4 transition-all ${
-              fulfilmentType === "collection"
-                ? "border-[#323C4B] bg-[#323C4B]/5 ring-2 ring-[#323C4B]"
-                : "border-gray-200 hover:border-gray-300"
-            }`}
+            className={`flex flex-col rounded-xl border-2 p-4 transition-all ${!availability.collectionAvailable
+              ? "cursor-not-allowed border-gray-200 bg-gray-100/70 opacity-75"
+              : fulfilmentType === "collection"
+                ? "cursor-pointer border-[#323C4B] bg-[#323C4B]/5 ring-2 ring-[#323C4B]"
+                : "cursor-pointer border-gray-200 hover:border-gray-300"
+              }`}
           >
             <div className="flex items-center justify-between">
               <span className="font-bold text-gray-900">🏬 In-Store Collection</span>
               <input
                 type="radio"
                 name="fulfilmentTypeRadio"
+                disabled={!availability.collectionAvailable}
                 checked={fulfilmentType === "collection"}
-                onChange={() => setFulfilmentType("collection")}
-                className="h-4 w-4 text-[#323C4B] focus:ring-[#323C4B]"
+                onChange={() => {
+                  if (availability.collectionAvailable) {
+                    setFulfilmentType("collection");
+                  }
+                }}
+                className="h-4 w-4 text-[#323C4B] focus:ring-[#323C4B] disabled:opacity-50"
               />
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Pick up directly from our shop near UB3 4NS. Always free with no minimum spend!
-            </p>
+            {availability.collectionAvailable ? (
+              <p className="mt-2 text-xs text-gray-500">
+                Pick up directly from our shop near UB3 4NS. Always free with no minimum spend!
+              </p>
+            ) : (
+              <p className="mt-2 text-xs font-medium text-red-700">
+                {availability.collectionUnavailableReason ||
+                  "In-store collection is currently unavailable."}
+              </p>
+            )}
           </label>
         </div>
+
+        {!availability.deliveryAvailable && !availability.collectionAvailable && (
+          <div
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-800"
+          >
+            Both Home Delivery and In-Store Collection are currently unavailable. Checkout cannot proceed until a fulfilment option is enabled and verified.
+          </div>
+        )}
       </div>
 
-      {/* 3. Delivery Address Form (shown only if Home Delivery selected) */}
+      {/* 3. Delivery Address / Collection Details */}
       {fulfilmentType === "delivery" ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
@@ -262,13 +320,12 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
             {/* Postcode Check Feedback Result */}
             {deliveryResult && (
               <div
-                className={`mt-3 rounded-xl p-3.5 text-xs ${
-                  deliveryResult.isEligible
-                    ? deliveryResult.isFreeDelivery
-                      ? "border border-green-200 bg-green-50 text-green-900"
-                      : "border border-blue-200 bg-blue-50 text-blue-900"
-                    : "border border-red-200 bg-red-50 text-red-900"
-                }`}
+                className={`mt-3 rounded-xl p-3.5 text-xs ${deliveryResult.isEligible
+                  ? deliveryResult.isFreeDelivery
+                    ? "border border-green-200 bg-green-50 text-green-900"
+                    : "border border-blue-200 bg-blue-50 text-blue-900"
+                  : "border border-red-200 bg-red-50 text-red-900"
+                  }`}
               >
                 <p className="font-semibold">
                   {deliveryResult.isEligible ? "✓ Delivery Available" : "✕ Delivery Unavailable"}
@@ -278,7 +335,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
             )}
           </div>
         </div>
-      ) : (
+      ) : fulfilmentType === "collection" ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
             3. Collection Details
@@ -291,7 +348,7 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
             </p>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* 4. Challenge 25 Age Verification Acknowledgment Gate (if basket has 18+ items) */}
       {summary.hasAgeRestrictedItems && (
@@ -344,10 +401,18 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
 
           <div className="flex justify-between">
             <span>
-              {fulfilmentType === "collection" ? "In-Store Collection" : "Home Delivery"}
+              {fulfilmentType === "delivery"
+                ? "Home Delivery"
+                : fulfilmentType === "collection"
+                  ? "In-Store Collection"
+                  : "Fulfilment"}
             </span>
             <span className="font-semibold text-gray-900">
-              {currentDeliveryFee === 0 ? "FREE" : `£${currentDeliveryFee.toFixed(2)}`}
+              {!fulfilmentType
+                ? "Unavailable"
+                : currentDeliveryFee === 0
+                  ? "FREE"
+                  : `£${currentDeliveryFee.toFixed(2)}`}
             </span>
           </div>
         </div>
@@ -361,7 +426,12 @@ export function CheckoutForm({ summary, initialProfile }: CheckoutFormProps) {
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={
+            isSubmitting ||
+            !fulfilmentType ||
+            (fulfilmentType === "delivery" && !availability.deliveryAvailable) ||
+            (fulfilmentType === "collection" && !availability.collectionAvailable)
+          }
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
         >
           {isSubmitting ? (

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireAdminAction } from "@/lib/admin-auth";
 
 export interface CategoryActionResult {
   success: boolean;
@@ -15,14 +15,11 @@ export interface CategoryActionResult {
 export async function createCategoryAction(
   formData: FormData
 ): Promise<CategoryActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { supabase } = auth;
 
   const name = String(formData.get("name") || "").trim();
   let slug = String(formData.get("slug") || "").trim().toLowerCase();
@@ -73,14 +70,11 @@ export async function updateCategoryAction(
   categoryId: string,
   formData: FormData
 ): Promise<CategoryActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { supabase } = auth;
 
   const name = String(formData.get("name") || "").trim();
   let slug = String(formData.get("slug") || "").trim().toLowerCase();
@@ -130,14 +124,11 @@ export async function toggleCategoryStatusAction(
   categoryId: string,
   currentStatus: boolean
 ): Promise<CategoryActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { supabase } = auth;
 
   const { error } = await supabase
     .from("categories")
@@ -163,14 +154,11 @@ export async function toggleCategoryStatusAction(
 export async function deleteCategoryAction(
   categoryId: string
 ): Promise<CategoryActionResult> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: "Authentication required" };
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
   }
+  const { supabase } = auth;
 
   // Check if products exist in this category
   const { count } = await supabase

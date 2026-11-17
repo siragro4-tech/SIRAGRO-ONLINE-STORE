@@ -1,45 +1,42 @@
 import type { Metadata } from "next";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { FALLBACK_CATEGORIES, FALLBACK_PRODUCTS } from "@/lib/products";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { CategoryManager } from "@/components/admin/CategoryManager";
+import type { Database } from "@/types/database.types";
 
 export const metadata: Metadata = {
   title: "Categories & Aisles",
 };
 
-export default async function AdminCategoriesPage() {
-  const supabase = await createServerSupabaseClient();
+type CategoryRow = Database["public"]["Tables"]["categories"]["Row"] & {
+  product_count?: number;
+};
 
-  let categories = FALLBACK_CATEGORIES.map((c) => ({
-    ...c,
-    product_count: FALLBACK_PRODUCTS.filter((p) => p.category_id === c.id).length,
+export default async function AdminCategoriesPage() {
+  const { supabase } = await requireAdminPage("/admin/categories");
+
+  const { data: dbCategories, error } = await supabase
+    .from("categories")
+    .select("*, products(id)")
+    .order("sort_order", { ascending: true });
+
+  const categories: CategoryRow[] = (dbCategories || []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    parent_id: c.parent_id,
+    description: c.description,
+    image_url: c.image_url,
+    sort_order: c.sort_order,
+    is_active: c.is_active,
+    created_at: c.created_at,
+    updated_at: c.updated_at,
+    product_count: Array.isArray(c.products) ? c.products.length : 0,
   }));
 
-  try {
-    const { data: dbCategories, error } = await supabase
-      .from("categories")
-      .select("*, products(id)")
-      .order("sort_order", { ascending: true });
-
-    if (!error && dbCategories && dbCategories.length > 0) {
-      categories = dbCategories.map((c) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        parent_id: c.parent_id,
-        description: c.description,
-        image_url: c.image_url,
-        sort_order: c.sort_order,
-        is_active: c.is_active,
-        created_at: c.created_at,
-        updated_at: c.updated_at,
-        product_count: Array.isArray(c.products) ? c.products.length : 0,
-      }));
-    }
-  } catch {
-    // Fallback to static categories
-  }
-
-  return <CategoryManager categories={categories} />;
+  return (
+    <CategoryManager
+      categories={categories}
+      loadError={error?.message || null}
+    />
+  );
 }
-

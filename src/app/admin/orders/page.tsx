@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireAdminPage } from "@/lib/admin-auth";
 import type { Database } from "@/types/database.types";
 
 export const metadata: Metadata = {
@@ -68,7 +68,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const dateFrom = params.dateFrom || "";
   const dateTo = params.dateTo || "";
 
-  const supabase = await createServerSupabaseClient();
+  const { supabase } = await requireAdminPage("/admin/orders");
 
   // Build the query with server-side pagination & filtering
   let query = supabase
@@ -140,7 +140,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
 
       {/* Filter & Search Bar */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 shadow-xs">
-        <form method="GET" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6 items-end">
+        <form method="GET" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-8 items-end">
           {/* Search Box */}
           <div className="lg:col-span-2">
             <label htmlFor="search" className="block text-xs font-semibold uppercase text-gray-600 mb-1">
@@ -153,7 +153,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
                 name="search"
                 defaultValue={searchQuery}
                 placeholder="Ref (e.g. SIR-123456), name, or email..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-[#323C4B] focus:outline-hidden focus:ring-1 focus:ring-[#323C4B]"
               />
             </div>
           </div>
@@ -167,7 +167,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
               id="status"
               name="status"
               defaultValue={statusFilter}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-hidden focus:ring-1 focus:ring-[#323C4B]"
             >
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
@@ -189,7 +189,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
               id="fulfilment"
               name="fulfilment"
               defaultValue={fulfilmentFilter}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-hidden focus:ring-1 focus:ring-[#323C4B]"
             >
               <option value="all">All Methods</option>
               <option value="delivery">Home Delivery</option>
@@ -206,7 +206,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
               id="payment"
               name="payment"
               defaultValue={paymentFilter}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-green-600 focus:outline-hidden focus:ring-1 focus:ring-green-600"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#323C4B] focus:outline-hidden focus:ring-1 focus:ring-[#323C4B]"
             >
               <option value="all">All Payments</option>
               <option value="paid">Paid</option>
@@ -214,6 +214,34 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
               <option value="refunded">Refunded</option>
               <option value="failed">Failed</option>
             </select>
+          </div>
+
+          {/* Date From */}
+          <div>
+            <label htmlFor="dateFrom" className="block text-xs font-semibold uppercase text-gray-600 mb-1">
+              From Date
+            </label>
+            <input
+              type="date"
+              id="dateFrom"
+              name="dateFrom"
+              defaultValue={dateFrom}
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs text-gray-900 focus:border-[#323C4B] focus:outline-hidden focus:ring-1 focus:ring-[#323C4B]"
+            />
+          </div>
+
+          {/* Date To */}
+          <div>
+            <label htmlFor="dateTo" className="block text-xs font-semibold uppercase text-gray-600 mb-1">
+              To Date
+            </label>
+            <input
+              type="date"
+              id="dateTo"
+              name="dateTo"
+              defaultValue={dateTo}
+              className="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-xs text-gray-900 focus:border-[#323C4B] focus:outline-hidden focus:ring-1 focus:ring-[#323C4B]"
+            />
           </div>
 
           {/* Action buttons */}
@@ -398,7 +426,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
             <div className="flex items-center gap-2">
               {currentPage > 1 ? (
                 <Link
-                  href={`/admin/orders?page=${currentPage - 1}&status=${statusFilter}&fulfilment=${fulfilmentFilter}&payment=${paymentFilter}&search=${encodeURIComponent(searchQuery)}`}
+                  href={`/admin/orders?page=${currentPage - 1}&status=${statusFilter}&fulfilment=${fulfilmentFilter}&payment=${paymentFilter}&search=${encodeURIComponent(searchQuery)}&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`}
                   className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs"
                 >
                   &larr; Previous
@@ -415,7 +443,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
 
               {currentPage < totalPages ? (
                 <Link
-                  href={`/admin/orders?page=${currentPage + 1}&status=${statusFilter}&fulfilment=${fulfilmentFilter}&payment=${paymentFilter}&search=${encodeURIComponent(searchQuery)}`}
+                  href={`/admin/orders?page=${currentPage + 1}&status=${statusFilter}&fulfilment=${fulfilmentFilter}&payment=${paymentFilter}&search=${encodeURIComponent(searchQuery)}&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`}
                   className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs"
                 >
                   Next &rarr;

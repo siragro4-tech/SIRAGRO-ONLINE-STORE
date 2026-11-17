@@ -5,9 +5,9 @@ import {
   updateOrderStatusAction,
   retryOrderNotificationAction,
   updateOrderNotesAction,
-  ALLOWED_TRANSITIONS,
   type OrderStatus,
 } from "@/app/admin/orders/actions";
+import { ORDER_ALLOWED_TRANSITIONS } from "@/lib/admin-rules";
 
 interface OrderStatusManagerProps {
   orderId: string;
@@ -28,7 +28,7 @@ interface OrderStatusManagerProps {
     id: string;
     recipient_email: string;
     status_target: string;
-    send_status: "pending" | "sent" | "failed";
+    send_status: "pending" | "sent" | "failed" | "not_configured";
     last_error: string | null;
     sent_at: string | null;
     created_at: string;
@@ -74,7 +74,8 @@ export function OrderStatusManager({
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   // Determine allowed transitions from the current state
-  const allowedNext = ALLOWED_TRANSITIONS[fulfilmentType]?.[currentStatus] || [];
+  const allowedNext =
+    ORDER_ALLOWED_TRANSITIONS[fulfilmentType]?.[currentStatus] || [];
   const isTerminal = allowedNext.length === 0;
 
   async function handleStatusChange(e: React.FormEvent) {
@@ -104,13 +105,20 @@ export function OrderStatusManager({
         });
       } else {
         let msg = res.message || "Status updated successfully.";
-        if (res.emailSent) {
-          msg += ` Notification email dispatched to ${customerEmail}.`;
+        if (res.emailStatus === "sent" && res.emailSent) {
+          msg += ` Notification email sent to ${customerEmail}.`;
+        } else if (res.emailStatus === "skipped") {
+          msg += " Customer notification was already sent for this status (duplicate skipped).";
+        } else if (res.emailStatus === "not_configured") {
+          msg += " Email NOT sent: email provider (Resend) is not configured.";
         } else if (res.emailError) {
-          msg += ` Warning: Status updated, but email sending failed: ${res.emailError}`;
+          msg += ` Warning: Status updated, but email was NOT sent: ${res.emailError}`;
         }
         setActionMessage({
-          type: res.emailError ? "warning" : "success",
+          type:
+            res.emailStatus === "not_configured" || res.emailError
+              ? "warning"
+              : "success",
           text: msg,
         });
         setSelectedStatus("");
@@ -422,42 +430,60 @@ export function OrderStatusManager({
               <div key={notif.id} className="py-2.5 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${
-                        notif.send_status === "sent"
-                          ? "bg-green-100 text-green-800"
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${
+                          notif.send_status === "sent"
+                            ? "bg-green-100 text-green-800"
+                            : notif.send_status === "failed"
+                            ? "bg-red-100 text-red-800"
+                            : notif.send_status === "not_configured"
+                            ? "bg-slate-200 text-slate-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {notif.send_status === "not_configured"
+                          ? "NOT CONFIGURED (NOT SENT)"
                           : notif.send_status === "failed"
-                          ? "bg-red-100 text-red-800"
-                          : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {notif.send_status.toUpperCase()}
-                    </span>
-                    <span className="font-medium text-gray-800">
-                      Target: {notif.status_target}
-                    </span>
-                    <span className="text-gray-400">({notif.recipient_email})</span>
+                          ? "NOT SENT (FAILED)"
+                          : notif.send_status.toUpperCase()}
+                      </span>
+                      <span className="font-medium text-gray-800">
+                        Target: {notif.status_target}
+                      </span>
+                      <span className="text-gray-500">
+                        Attempt #{notif.attempt_count || 1}
+                      </span>
+                      <span className="text-gray-400">({notif.recipient_email})</span>
+                    </div>
+                    {notif.last_error && (
+                      <p
+                        className={`mt-1 ${
+                          notif.send_status === "not_configured"
+                            ? "text-amber-800"
+                            : "text-red-600"
+                        }`}
+                      >
+                        Detail: {notif.last_error}
+                      </p>
+                    )}
+                    <p className="text-gray-400 mt-0.5">
+                      {new Date(notif.created_at).toLocaleString("en-GB", {
+                        timeZone: "Europe/London",
+                      })}
+                    </p>
                   </div>
-                  {notif.last_error && (
-                    <p className="text-red-600 mt-1">Error: {notif.last_error}</p>
-                  )}
-                  <p className="text-gray-400 mt-0.5">
-                    {new Date(notif.created_at).toLocaleString("en-GB", {
-                      timeZone: "Europe/London",
-                    })}
-                  </p>
-                </div>
 
-                {notif.send_status === "failed" && (
-                  <button
-                    type="button"
-                    onClick={() => handleRetryNotification(notif.id)}
-                    disabled={retryingId === notif.id}
-                    className="rounded-lg border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
-                  >
-                    {retryingId === notif.id ? "Retrying..." : "Retry Email"}
-                  </button>
-                )}
+                  {(notif.send_status === "failed" ||
+                    notif.send_status === "not_configured") && (
+                    <button
+                      type="button"
+                      onClick={() => handleRetryNotification(notif.id)}
+                      disabled={retryingId === notif.id}
+                      className="rounded-lg border border-red-300 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+                    >
+                      {retryingId === notif.id ? "Retrying..." : "Retry Email"}
+                    </button>
+                  )}
               </div>
             ))}
           </div>

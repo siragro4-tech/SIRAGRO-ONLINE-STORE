@@ -1,17 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { sendStatusUpdateEmail } from "@/lib/email";
+import { requireAdminAction } from "@/lib/admin-auth";
+import {
+  ORDER_ALLOWED_TRANSITIONS,
+  isValidOrderTransition,
+  type OrderStatusValue,
+} from "@/lib/admin-rules";
+import { recordAdminActivity } from "@/lib/activity";
+import {
+  sendOrderConfirmationEmail,
+  sendStatusUpdateEmail,
+} from "@/lib/email";
+import {
+  getNextAttemptCount,
+  isLegacyNotificationConstraintError,
+  resolveNotificationRecord,
+  type NotificationSendStatus,
+} from "@/lib/email-status";
+import type { Json } from "@/types/database.types";
 
-export type OrderStatus =
-  | "pending"
-  | "processing"
-  | "ready_for_pickup"
-  | "out_for_delivery"
-  | "delivered"
-  | "collected"
-  | "cancelled";
+export type OrderStatus = OrderStatusValue;
 
 export interface StatusActionResult {
   success: boolean;
@@ -19,64 +28,8 @@ export interface StatusActionResult {
   error?: string;
   noop?: boolean;
   emailSent?: boolean;
+  emailStatus?: NotificationSendStatus | "skipped";
   emailError?: string;
-}
-
-/**
- * Valid allowed status transitions per fulfillment type.
- * Prevents arbitrary string manipulation and impossible state jumps.
- */
-export const ALLOWED_TRANSITIONS: Record<
-  "delivery" | "collection",
-  Record<OrderStatus, OrderStatus[]>
-> = {
-  delivery: {
-    pending: ["processing", "cancelled"],
-    processing: ["out_for_delivery", "cancelled"],
-    ready_for_pickup: [], // Not applicable for delivery
-    out_for_delivery: ["delivered", "processing"],
-    delivered: [], // Terminal
-    collected: [], // Not applicable for delivery
-    cancelled: [], // Terminal
-  },
-  collection: {
-    pending: ["processing", "cancelled"],
-    processing: ["ready_for_pickup", "cancelled"],
-    ready_for_pickup: ["collected", "processing", "cancelled"],
-    out_for_delivery: [], // Not applicable for collection
-    delivered: [], // Not applicable for collection
-    collected: [], // Terminal
-    cancelled: [], // Terminal
-  },
-};
-
-/**
- * Helper to check server-side admin credentials.
- */
-async function verifyAdminAuth() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { authorized: false as const, error: "Authentication required" };
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, email, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") {
-    return {
-      authorized: false as const,
-      error: "Forbidden: Administrative privileges required",
-    };
-  }
-
-  return { authorized: true as const, user, profile, supabase };
 }
 
 /**
@@ -84,7 +37,7 @@ async function verifyAdminAuth() {
  * - Enforces admin authentication
  * - Enforces allowed state machine transitions
  * - Never modifies payment status
- * - Records audit trail in order_status_history
+ * - Records audit trail in order_status_history and admin_activity_events
  * - Sends transactional email and logs status in order_notifications
  */
 export async function updateOrderStatusAction(
@@ -93,7 +46,7 @@ export async function updateOrderStatusAction(
   adminNotes?: string,
   sendEmailNotification: boolean = true
 ): Promise<StatusActionResult> {
-  const authCheck = await verifyAdminAuth();
+  const authCheck = await requireAdminAction();
   if (!authCheck.authorized) {
     return { success: false, error: authCheck.error };
   }
@@ -125,9 +78,9 @@ export async function updateOrderStatusAction(
 
   // 3. Validate state transition rules
   const allowedNextStatuses =
-    ALLOWED_TRANSITIONS[fulfilmentType]?.[currentStatus] || [];
+    ORDER_ALLOWED_TRANSITIONS[fulfilmentType]?.[currentStatus] || [];
 
-  if (!allowedNextStatuses.includes(newStatus)) {
+  if (!isValidOrderTransition(fulfilmentType, currentStatus, newStatus)) {
     return {
       success: false,
       error: `Invalid transition: A ${fulfilmentType} order cannot transition directly from "${currentStatus}" to "${newStatus}". Allowed transitions: ${
@@ -176,45 +129,106 @@ export async function updateOrderStatusAction(
     );
   }
 
-  // 6. Send Customer Notification Email (if requested)
+  // 5.5 Record in Admin Activity Feed
+  await recordAdminActivity({
+    event_type: "order_status_updated",
+    severity: newStatus === "cancelled" ? "warning" : "info",
+    title: `Order #${order.order_number} → ${newStatus.replace(/_/g, " ")}`,
+    summary: `Fulfilment updated from "${currentStatus}" to "${newStatus}" by ${profile.email}. Payment status remains "${order.payment_status}".`,
+    order_id: orderId,
+    metadata: {
+      order_number: order.order_number,
+      previous_status: currentStatus,
+      new_status: newStatus,
+    } as Json,
+  });
+
+  // 6. Send Customer Notification Email (if requested and not already sent for this target status)
   let emailSent = false;
+  let emailStatus: NotificationSendStatus | "skipped" | undefined;
   let emailErrorMessage: string | undefined;
 
   if (sendEmailNotification && order.customer_email) {
-    const rawAddr = order.delivery_address as Record<string, string> | null;
-    const formattedAddress = rawAddr
-      ? `${rawAddr.line1 || rawAddr.line_1 || ""}, ${rawAddr.city || ""}, ${rawAddr.postcode || ""}`
-      : null;
-
-    const emailResult = await sendStatusUpdateEmail({
-      orderNumber: order.order_number,
-      customerName: order.customer_name,
-      customerEmail: order.customer_email,
-      fulfilmentType,
-      newStatus,
-      deliveryAddress: formattedAddress,
-      adminNotes: adminNotes?.trim() || null,
-    });
-
-    emailSent = emailResult.success;
-    emailErrorMessage = emailResult.error;
-
-    // 7. Persist notification log
+    let alreadySentForTarget = false;
     try {
-      await supabase.from("order_notifications").insert({
-        order_id: orderId,
-        recipient_email: order.customer_email,
-        notification_type: "status_update",
-        status_target: newStatus,
-        send_status: emailSent ? "sent" : "failed",
-        last_error: emailErrorMessage || null,
-        sent_at: emailSent ? new Date().toISOString() : null,
+      const { data: existingSent } = await supabase
+        .from("order_notifications")
+        .select("id")
+        .eq("order_id", orderId)
+        .eq("notification_type", "status_update")
+        .eq("status_target", newStatus)
+        .eq("send_status", "sent")
+        .limit(1)
+        .maybeSingle();
+      if (existingSent) {
+        alreadySentForTarget = true;
+      }
+    } catch {
+      // Proceed cleanly if notification table check is unavailable
+    }
+
+    if (alreadySentForTarget) {
+      emailStatus = "skipped";
+    } else {
+      const rawAddr = order.delivery_address as Record<string, string> | null;
+      const formattedAddress = rawAddr
+        ? `${rawAddr.line1 || rawAddr.line_1 || ""}, ${rawAddr.city || ""}, ${rawAddr.postcode || ""}`
+        : null;
+
+      const emailResult = await sendStatusUpdateEmail({
+        orderNumber: order.order_number,
+        customerName: order.customer_name,
+        customerEmail: order.customer_email,
+        fulfilmentType,
+        newStatus,
+        deliveryAddress: formattedAddress,
+        adminNotes: adminNotes?.trim() || null,
       });
-    } catch (notifErr) {
-      console.warn(
-        "[Orders Action] Notice: Could not record order_notifications log:",
-        notifErr
-      );
+
+      const resolved = resolveNotificationRecord(emailResult);
+      emailSent = resolved.send_status === "sent";
+      emailStatus = resolved.send_status;
+      emailErrorMessage = resolved.last_error || undefined;
+
+      // 7. Persist notification log accurately (never record 'sent' when simulated/unconfigured)
+      try {
+        const { error: insertNotifErr } = await supabase
+          .from("order_notifications")
+          .insert({
+            order_id: orderId,
+            recipient_email: order.customer_email,
+            notification_type: "status_update",
+            status_target: newStatus,
+            send_status: resolved.send_status,
+            attempt_count: 1,
+            last_error: resolved.last_error,
+            sent_at: resolved.sent_at,
+          });
+
+        if (
+          insertNotifErr &&
+          resolved.send_status === "not_configured" &&
+          isLegacyNotificationConstraintError(insertNotifErr)
+        ) {
+          await supabase.from("order_notifications").insert({
+            order_id: orderId,
+            recipient_email: order.customer_email,
+            notification_type: "status_update",
+            status_target: newStatus,
+            send_status: "failed",
+            attempt_count: 1,
+            last_error:
+              resolved.last_error ||
+              "Email provider not configured — email was not sent.",
+            sent_at: null,
+          });
+        }
+      } catch (notifErr) {
+        console.warn(
+          "[Orders Action] Notice: Could not record order_notifications log:",
+          notifErr
+        );
+      }
     }
   }
 
@@ -227,6 +241,7 @@ export async function updateOrderStatusAction(
     success: true,
     message: `Status updated from "${currentStatus}" to "${newStatus}".`,
     emailSent,
+    emailStatus,
     emailError: emailErrorMessage,
   };
 }
@@ -238,7 +253,7 @@ export async function retryOrderNotificationAction(
   orderId: string,
   notificationId?: string
 ): Promise<{ success: boolean; message: string; error?: string }> {
-  const authCheck = await verifyAdminAuth();
+  const authCheck = await requireAdminAction();
   if (!authCheck.authorized) {
     return { success: false, message: "Unauthorized", error: authCheck.error };
   }
@@ -255,31 +270,124 @@ export async function retryOrderNotificationAction(
     return { success: false, message: "Order not found" };
   }
 
+  let existingNotif: {
+    id: string;
+    notification_type: string;
+    status_target: string;
+    send_status: string;
+    attempt_count: number;
+  } | null = null;
+
+  if (notificationId) {
+    const { data: notifRow, error: notifLookupErr } = await supabase
+      .from("order_notifications")
+      .select("id, notification_type, status_target, send_status, attempt_count")
+      .eq("id", notificationId)
+      .eq("order_id", orderId)
+      .maybeSingle();
+
+    if (notifLookupErr || !notifRow) {
+      return {
+        success: false,
+        message: "Notification record could not be loaded for this order.",
+        error: notifLookupErr?.message,
+      };
+    }
+
+    if (notifRow.send_status === "sent") {
+      return {
+        success: true,
+        message: "Notification was already sent — duplicate send prevented.",
+      };
+    }
+
+    existingNotif = notifRow;
+  }
+
+  const targetStatus = existingNotif?.status_target || order.status;
   const rawAddr = order.delivery_address as Record<string, string> | null;
   const formattedAddress = rawAddr
     ? `${rawAddr.line1 || rawAddr.line_1 || ""}, ${rawAddr.city || ""}, ${rawAddr.postcode || ""}`
     : null;
 
-  const emailResult = await sendStatusUpdateEmail({
-    orderNumber: order.order_number,
-    customerName: order.customer_name,
-    customerEmail: order.customer_email,
-    fulfilmentType: order.fulfilment_type as "delivery" | "collection",
-    newStatus: order.status,
-    deliveryAddress: formattedAddress,
-  });
+  let emailResult;
+  if (existingNotif?.notification_type === "confirmation") {
+    const [{ data: items }, { data: ageLog }] = await Promise.all([
+      supabase
+        .from("order_items")
+        .select("product_name_snapshot, quantity, unit_price_snapshot, line_total")
+        .eq("order_id", orderId),
+      supabase
+        .from("age_verification_log")
+        .select("id")
+        .eq("order_id", orderId)
+        .maybeSingle(),
+    ]);
+
+    emailResult = await sendOrderConfirmationEmail({
+      orderNumber: order.order_number,
+      customerName: order.customer_name,
+      customerEmail: order.customer_email,
+      fulfilmentType: order.fulfilment_type as "delivery" | "collection",
+      deliveryAddress: formattedAddress || undefined,
+      items: (items || []).map((i) => ({
+        name: i.product_name_snapshot,
+        quantity: i.quantity,
+        unitPrice: Number(i.unit_price_snapshot),
+        lineTotal: Number(i.line_total),
+      })),
+      subtotal: Number(order.subtotal),
+      deliveryCharge: Number(order.delivery_charge),
+      total: Number(order.total),
+      hasAgeRestrictedItems: Boolean(ageLog),
+    });
+  } else {
+    emailResult = await sendStatusUpdateEmail({
+      orderNumber: order.order_number,
+      customerName: order.customer_name,
+      customerEmail: order.customer_email,
+      fulfilmentType: order.fulfilment_type as "delivery" | "collection",
+      newStatus: targetStatus,
+      deliveryAddress: formattedAddress,
+    });
+  }
+
+  const resolved = resolveNotificationRecord(emailResult);
+  const nextAttemptCount = getNextAttemptCount(existingNotif?.attempt_count);
 
   if (notificationId) {
     try {
-      await supabase
+      const { error: updateNotifErr } = await supabase
         .from("order_notifications")
         .update({
-          send_status: emailResult.success ? "sent" : "failed",
-          last_error: emailResult.error || null,
-          sent_at: emailResult.success ? new Date().toISOString() : null,
+          send_status: resolved.send_status,
+          attempt_count: nextAttemptCount,
+          last_error: resolved.last_error,
+          sent_at: resolved.sent_at,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", notificationId);
+        .eq("id", notificationId)
+        .eq("order_id", orderId);
+
+      if (
+        updateNotifErr &&
+        resolved.send_status === "not_configured" &&
+        isLegacyNotificationConstraintError(updateNotifErr)
+      ) {
+        await supabase
+          .from("order_notifications")
+          .update({
+            send_status: "failed",
+            attempt_count: nextAttemptCount,
+            last_error:
+              resolved.last_error ||
+              "Email provider not configured — email was not sent.",
+            sent_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", notificationId)
+          .eq("order_id", orderId);
+      }
     } catch {
       // Non-fatal if table not migrated yet
     }
@@ -290,14 +398,16 @@ export async function retryOrderNotificationAction(
   if (!emailResult.success) {
     return {
       success: false,
-      message: "Email sending failed on retry",
+      message: emailResult.notConfigured
+        ? "Email provider not configured — email was not sent"
+        : "Email sending failed on retry",
       error: emailResult.error,
     };
   }
 
   return {
     success: true,
-    message: `Notification email successfully re-sent to ${order.customer_email}`,
+    message: `Notification email sent successfully (attempt #${nextAttemptCount}).`,
   };
 }
 
@@ -308,7 +418,7 @@ export async function updateOrderNotesAction(
   orderId: string,
   notes: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const authCheck = await verifyAdminAuth();
+  const authCheck = await requireAdminAction();
   if (!authCheck.authorized) {
     return { success: false, error: authCheck.error };
   }

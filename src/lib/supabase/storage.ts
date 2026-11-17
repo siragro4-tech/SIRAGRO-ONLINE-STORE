@@ -6,22 +6,41 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getProductImageUrl } from "@/lib/product-image";
+import { validateProductImageFile } from "@/lib/admin-rules";
 
 // Re-export so server code has a single import point
 export { getProductImageUrl } from "@/lib/product-image";
 
+const SAFE_EXTENSION_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 /**
- * Uploads an image file to the Supabase Storage 'product-images' bucket.
- * Returns the stored file path or throws an error.
- * SERVER-ONLY — uses createServerSupabaseClient (next/headers).
+ * Validates and uploads an image file to the Supabase Storage 'product-images' bucket.
+ * Never stores binary image data in PostgreSQL tables.
  */
 export async function uploadProductImage(
   file: File,
   folder = "products"
 ): Promise<{ storagePath: string; publicUrl: string }> {
+  const validation = validateProductImageFile({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  });
+
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
   const supabase = await createServerSupabaseClient();
 
-  const fileExt = file.name.split(".").pop() || "jpg";
+  const fileExt =
+    SAFE_EXTENSION_BY_MIME[file.type.toLowerCase()] ||
+    file.name.split(".").pop()?.toLowerCase() ||
+    "jpg";
   const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   const filePath = `${folder}/${uniqueId}.${fileExt}`;
 
@@ -45,4 +64,28 @@ export async function uploadProductImage(
     storagePath: filePath,
     publicUrl,
   };
+}
+
+/**
+ * Deletes a stored object from the 'product-images' bucket when it is a bucket path
+ * (ignores external URLs starting with http/https or leading slash).
+ */
+export async function deleteProductImageFromStorage(
+  storagePath?: string | null
+): Promise<void> {
+  if (
+    !storagePath ||
+    storagePath.startsWith("http://") ||
+    storagePath.startsWith("https://") ||
+    storagePath.startsWith("/")
+  ) {
+    return;
+  }
+
+  try {
+    const supabase = await createServerSupabaseClient();
+    await supabase.storage.from("product-images").remove([storagePath]);
+  } catch {
+    // Non-fatal cleanup failure
+  }
 }
