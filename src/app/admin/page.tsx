@@ -441,20 +441,6 @@ export default async function AdminDashboardPage({
         </div>
       )}
 
-      {/* Migration Notice (if 004 hasn't been applied yet) */}
-      {activityPendingMigration && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
-          <p className="font-bold text-sm">Activity &amp; Inventory Migration Pending</p>
-          <p className="mt-1">
-            To enable the live in-dashboard notification feed, privacy-safe basket metrics, and inventory adjustment history, apply{" "}
-            <code className="font-mono font-semibold">
-              supabase/migrations/004_admin_activity_and_inventory.sql
-            </code>{" "}
-            in your Supabase SQL Editor.
-          </p>
-        </div>
-      )}
-
       {ordersTruncated && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
           Showing revenue calculations across the latest {ORDERS_ANALYTICS_LIMIT} orders for this period.
