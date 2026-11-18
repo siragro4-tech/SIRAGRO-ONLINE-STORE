@@ -26,6 +26,8 @@ const PERIOD_LABELS: Record<SalesPeriod, string> = {
   all: "All Time",
 };
 
+const ORDERS_ANALYTICS_LIMIT = 2000;
+
 function parsePeriod(raw?: string): SalesPeriod {
   if (raw === "today" || raw === "7d" || raw === "month" || raw === "all") {
     return raw;
@@ -39,6 +41,48 @@ function getLondonDateKey(date: Date): string {
   }).format(date);
 }
 
+function formatLondonShortDateTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+function getPeriodQueryStartIso(period: SalesPeriod, now: Date): string | null {
+  const copy = new Date(now);
+  if (period === "today") {
+    copy.setUTCDate(copy.getUTCDate() - 2);
+    return copy.toISOString();
+  }
+  if (period === "7d") {
+    copy.setUTCDate(copy.getUTCDate() - 9);
+    return copy.toISOString();
+  }
+  if (period === "month") {
+    copy.setUTCDate(copy.getUTCDate() - 33);
+    return copy.toISOString();
+  }
+  return null;
+}
+
+function isMissingSchemaError(message?: string | null): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("does not exist") ||
+    lower.includes("schema cache") ||
+    lower.includes("could not find")
+  );
+}
+
 export default async function AdminDashboardPage({
   searchParams,
 }: AdminDashboardPageProps) {
@@ -47,86 +91,194 @@ export default async function AdminDashboardPage({
 
   const { supabase } = await requireAdminPage("/admin");
 
+  const now = new Date();
+  const todayLondon = getLondonDateKey(now);
+  const twoDaysAgoIso = getPeriodQueryStartIso("today", now)!;
+  const periodStartIso = getPeriodQueryStartIso(selectedPeriod, now);
+
   // Query errors tracked explicitly — never mask failures as zero
   const queryErrors: string[] = [];
 
-  // 1. Fetch Orders for Sales & Operational Metrics
-  const { data: allOrders, error: ordersErr } = await supabase
+  let periodOrdersQuery = supabase
     .from("orders")
-    .select(
-      "id, order_number, status, fulfilment_type, customer_name, total, payment_status, created_at"
-    )
-    .order("created_at", { ascending: false });
+    .select("id, status, payment_status, total, created_at")
+    .order("created_at", { ascending: false })
+    .limit(ORDERS_ANALYTICS_LIMIT);
 
-  if (ordersErr) {
-    queryErrors.push(`Orders query failed: ${ordersErr.message}`);
+  if (periodStartIso) {
+    periodOrdersQuery = periodOrdersQuery.gte("created_at", periodStartIso);
   }
 
-  // Also check if migration 004 refunded_amount exists safely
-  let refundMap: Record<string, number> = {};
-  if (!ordersErr && allOrders && allOrders.length > 0) {
-    const { data: refundRows } = await supabase
+  const [
+    periodOrdersRes,
+    todayOrdersRes,
+    awaitingCountRes,
+    recentOrdersRes,
+    totalProductsRes,
+    lowStockCountRes,
+    outOfStockCountRes,
+    stockAttentionRes,
+    productSnapshotRes,
+    categoriesRes,
+    deliverySettingsRes,
+    eventsRes,
+    contactRes,
+  ] = await Promise.all([
+    periodOrdersQuery,
+    selectedPeriod === "all"
+      ? supabase
+          .from("orders")
+          .select("id, status, payment_status, total, created_at")
+          .gte("created_at", twoDaysAgoIso)
+          .limit(1000)
+      : Promise.resolve(null),
+    supabase
       .from("orders")
-      .select("id, refunded_amount");
-    if (refundRows) {
+      .select("id", { count: "exact", head: true })
+      .in("status", [
+        "pending",
+        "processing",
+        "ready_for_pickup",
+        "out_for_delivery",
+      ]),
+    supabase
+      .from("orders")
+      .select(
+        "id, order_number, status, fulfilment_type, total, payment_status, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(6),
+    supabase.from("products").select("id", { count: "exact", head: true }),
+    supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .gt("stock_quantity", 0)
+      .lte("stock_quantity", 10),
+    supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .lte("stock_quantity", 0),
+    supabase
+      .from("products")
+      .select("id, name, stock_quantity")
+      .lte("stock_quantity", 10)
+      .order("stock_quantity", { ascending: true })
+      .limit(6),
+    supabase
+      .from("products")
+      .select(
+        "id, name, category_id, price, stock_quantity, is_available, is_age_restricted"
+      )
+      .order("created_at", { ascending: false })
+      .limit(6),
+    supabase.from("categories").select("id, name", { count: "exact" }),
+    supabase.from("delivery_settings").select("*").limit(1).maybeSingle(),
+    supabase
+      .from("admin_activity_events")
+      .select(
+        "id, event_type, severity, title, summary, order_id, product_id, is_read, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(15),
+    supabase
+      .from("contact_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "new"),
+  ]);
+
+  const ordersErr = periodOrdersRes.error;
+  const periodOrders = periodOrdersRes.data || [];
+  const ordersTruncated =
+    !ordersErr && periodOrders.length === ORDERS_ANALYTICS_LIMIT;
+
+  if (ordersErr) {
+    queryErrors.push(`Orders metrics query failed: ${ordersErr.message}`);
+  }
+  if (todayOrdersRes?.error) {
+    queryErrors.push(`Today orders query failed: ${todayOrdersRes.error.message}`);
+  }
+  if (awaitingCountRes.error) {
+    queryErrors.push(
+      `Awaiting fulfilment query failed: ${awaitingCountRes.error.message}`
+    );
+  }
+  if (recentOrdersRes.error) {
+    queryErrors.push(
+      `Recent orders query failed: ${recentOrdersRes.error.message}`
+    );
+  }
+
+  // Safely check migration 004 refunded_amount column for settled/refunded orders
+  let refundMap: Record<string, number> = {};
+  let refundSchemaSupported = true;
+  const relevantOrderIds = periodOrders
+    .filter((o) => o.payment_status === "paid" || o.payment_status === "refunded")
+    .map((o) => o.id);
+
+  if (!ordersErr && relevantOrderIds.length > 0) {
+    const { data: refundRows, error: refundErr } = await supabase
+      .from("orders")
+      .select("id, refunded_amount")
+      .in("id", relevantOrderIds);
+
+    if (refundErr) {
+      if (isMissingSchemaError(refundErr.message)) {
+        refundSchemaSupported = false;
+      } else {
+        refundSchemaSupported = false;
+        queryErrors.push(`Refund amount query failed: ${refundErr.message}`);
+      }
+    } else if (refundRows) {
       refundMap = Object.fromEntries(
         refundRows.map((r) => [r.id, Number(r.refunded_amount || 0)])
       );
     }
   }
 
-  // 2. Fetch Product Stock Snapshot (lightweight columns only for 1,500+ scale)
-  const { data: allProducts, error: productsErr } = await supabase
-    .from("products")
-    .select("id, name, stock_quantity, is_available, is_age_restricted");
+  // Product & Stock Errors (any failure tracked explicitly)
+  const productsCountErr =
+    totalProductsRes.error ||
+    lowStockCountRes.error ||
+    outOfStockCountRes.error ||
+    stockAttentionRes.error ||
+    productSnapshotRes.error;
 
-  if (productsErr) {
-    queryErrors.push(`Products query failed: ${productsErr.message}`);
+  if (productsCountErr) {
+    queryErrors.push(`Products query failed: ${productsCountErr.message}`);
   }
 
-  // 3. Fetch Categories count
-  const { count: categoriesCount, error: catErr } = await supabase
-    .from("categories")
-    .select("id", { count: "exact", head: true });
-
+  const catErr = categoriesRes.error;
   if (catErr) {
     queryErrors.push(`Categories query failed: ${catErr.message}`);
   }
+  const categoryNameById = Object.fromEntries(
+    (categoriesRes.data || []).map((c) => [c.id, c.name])
+  );
 
-  // 4. Fetch Delivery Settings (live DB values, never invented)
-  const { data: deliverySettings, error: deliverySettingsErr } = await supabase
-    .from("delivery_settings")
-    .select("*")
-    .limit(1)
-    .maybeSingle();
-
+  const deliverySettings = deliverySettingsRes.data;
+  const deliverySettingsErr = deliverySettingsRes.error;
   if (deliverySettingsErr) {
-    queryErrors.push(`Delivery settings query failed: ${deliverySettingsErr.message}`);
+    queryErrors.push(
+      `Delivery settings query failed: ${deliverySettingsErr.message}`
+    );
   }
 
-  // 5. Fetch Activity Events & Cart Aggregates (graceful if migration 004 pending)
+  // Activity Feed & Cart Aggregates
   let activityEvents: ActivityEventItem[] = [];
   let activityPendingMigration = false;
-  const { data: eventsData, error: eventsErr } = await supabase
-    .from("admin_activity_events")
-    .select(
-      "id, event_type, severity, title, summary, order_id, product_id, is_read, created_at"
-    )
-    .order("created_at", { ascending: false })
-    .limit(15);
+  let activityQueryErr: string | null = null;
 
-  if (eventsErr) {
-    if (
-      eventsErr.message.includes("does not exist") ||
-      eventsErr.message.includes("schema cache")
-    ) {
+  if (eventsRes.error) {
+    if (isMissingSchemaError(eventsRes.error.message)) {
       activityPendingMigration = true;
+    } else {
+      activityQueryErr = eventsRes.error.message;
+      queryErrors.push(`Activity feed query failed: ${eventsRes.error.message}`);
     }
-  } else if (eventsData) {
-    activityEvents = eventsData as ActivityEventItem[];
+  } else if (eventsRes.data) {
+    activityEvents = eventsRes.data as ActivityEventItem[];
   }
 
-  const todayLondon = getLondonDateKey(new Date());
   let topCartToday: Array<{
     id: string;
     product_id: string;
@@ -134,60 +286,82 @@ export default async function AdminDashboardPage({
     add_count: number;
     total_units_added: number;
   }> = [];
+  let cartQueryErr: string | null = null;
 
-  if (!activityPendingMigration) {
-    const { data: cartRows } = await supabase
+  if (!activityPendingMigration && !activityQueryErr) {
+    const { data: cartRows, error: cartErr } = await supabase
       .from("cart_activity_daily")
       .select("id, product_id, product_name_snapshot, add_count, total_units_added")
       .eq("activity_date", todayLondon)
       .order("total_units_added", { ascending: false })
       .limit(5);
-    if (cartRows) topCartToday = cartRows;
+
+    if (cartErr) {
+      if (isMissingSchemaError(cartErr.message)) {
+        activityPendingMigration = true;
+      } else {
+        cartQueryErr = cartErr.message;
+        queryErrors.push(`Cart demand query failed: ${cartErr.message}`);
+      }
+    } else if (cartRows) {
+      topCartToday = cartRows;
+    }
   }
 
-  // 6. Fetch Unread Contact Enquiries Count (from contact_messages table)
-  let newContactCount = 0;
-  const { count: contactCount } = await supabase
-    .from("contact_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "new");
-  newContactCount = contactCount ?? 0;
+  const contactErr = contactRes.error;
+  if (contactErr) {
+    queryErrors.push(`Contact enquiries query failed: ${contactErr.message}`);
+  }
 
-  // Compute Revenue & Operational Metrics
-  const enrichedOrders = (allOrders || []).map((o) => ({
+  // Compute Verified Revenue & Operational Metrics
+  const enrichedPeriodOrders = periodOrders.map((o) => ({
     ...o,
     refunded_amount: refundMap[o.id] ?? 0,
   }));
 
   const revenueSummary = !ordersErr
-    ? calculateRevenueSummary(enrichedOrders, selectedPeriod)
-    : null;
-  const todaySummary = !ordersErr
-    ? calculateRevenueSummary(enrichedOrders, "today")
+    ? calculateRevenueSummary(enrichedPeriodOrders, selectedPeriod)
     : null;
 
-  const ordersTodayTotal = !ordersErr
-    ? (allOrders || []).filter(
+  const todaySourceOrders =
+    selectedPeriod === "all"
+      ? !todayOrdersRes?.error
+        ? (todayOrdersRes?.data || []).map((o) => ({
+            ...o,
+            refunded_amount: refundMap[o.id] ?? 0,
+          }))
+        : null
+      : !ordersErr
+        ? enrichedPeriodOrders
+        : null;
+
+  const todaySummary = todaySourceOrders
+    ? calculateRevenueSummary(todaySourceOrders, "today")
+    : null;
+
+  const ordersTodayTotal = todaySourceOrders
+    ? todaySourceOrders.filter(
         (o) => getLondonDateKey(new Date(o.created_at)) === todayLondon
       ).length
     : null;
 
-  const awaitingFulfilmentCount = !ordersErr
-    ? (allOrders || []).filter((o) =>
-        ["pending", "processing", "ready_for_pickup", "out_for_delivery"].includes(
-          o.status
-        )
-      ).length
+  const awaitingFulfilmentCount = !awaitingCountRes.error
+    ? awaitingCountRes.count ?? 0
     : null;
 
-  const lowStockProducts = (allProducts || []).filter(
-    (p) => classifyStockStatus(p.stock_quantity) === "low_stock"
-  );
-  const outOfStockProducts = (allProducts || []).filter(
-    (p) => classifyStockStatus(p.stock_quantity) === "out_of_stock"
-  );
-
-  const recentOrders = (allOrders || []).slice(0, 6);
+  const recentOrders = recentOrdersRes.data || [];
+  const totalProductsCount = !totalProductsRes.error
+    ? totalProductsRes.count ?? 0
+    : null;
+  const lowStockCount = !lowStockCountRes.error
+    ? lowStockCountRes.count ?? 0
+    : null;
+  const outOfStockCount = !outOfStockCountRes.error
+    ? outOfStockCountRes.count ?? 0
+    : null;
+  const stockAttentionItems = stockAttentionRes.data || [];
+  const productSnapshotItems = productSnapshotRes.data || [];
+  const categoriesCount = !catErr ? categoriesRes.count ?? 0 : null;
 
   return (
     <div className="space-y-8">
@@ -213,8 +387,18 @@ export default async function AdminDashboardPage({
             href="/admin/products/new"
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#323C4B] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#242c37] transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2.2}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
             </svg>
             Add Product
           </Link>
@@ -250,6 +434,12 @@ export default async function AdminDashboardPage({
         </div>
       )}
 
+      {ordersTruncated && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          Showing revenue calculations across the latest {ORDERS_ANALYTICS_LIMIT} orders for this period.
+        </div>
+      )}
+
       {/* Section 1: Verified Paid Sales & Period Filter */}
       <section aria-labelledby="sales-heading" className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -266,7 +456,11 @@ export default async function AdminDashboardPage({
           </div>
 
           {/* Period Selector Pills */}
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Select sales period">
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Select sales period"
+          >
             {(["today", "7d", "month", "all"] as SalesPeriod[]).map((p) => (
               <Link
                 key={p}
@@ -287,13 +481,15 @@ export default async function AdminDashboardPage({
           {/* Revenue Card */}
           <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-xs">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-              {revenueSummary?.hasRecordedRefunds
-                ? "Net Paid Revenue"
-                : "Gross Paid Sales (Before Refunds)"}
+              {!refundSchemaSupported
+                ? "Gross Paid Sales (Refund schema pending)"
+                : revenueSummary?.hasRecordedRefunds
+                  ? "Net Paid Revenue"
+                  : "Gross Paid Sales (Before Refunds)"}
             </span>
             <div className="mt-2 font-mono text-3xl font-black text-slate-900">
               {revenueSummary
-                ? `£${(revenueSummary.hasRecordedRefunds
+                ? `£${(refundSchemaSupported && revenueSummary.hasRecordedRefunds
                     ? revenueSummary.netPaidRevenue
                     : revenueSummary.grossPaidRevenue
                   ).toFixed(2)}`
@@ -301,7 +497,7 @@ export default async function AdminDashboardPage({
             </div>
             <p className="mt-2 text-xs text-emerald-800 font-medium">
               {revenueSummary
-                ? revenueSummary.hasRecordedRefunds
+                ? refundSchemaSupported && revenueSummary.hasRecordedRefunds
                   ? `Gross £${revenueSummary.grossPaidRevenue.toFixed(2)} − Refunds £${revenueSummary.refundedTotal.toFixed(2)}`
                   : `${revenueSummary.paidOrderCount} verified paid order${revenueSummary.paidOrderCount !== 1 ? "s" : ""}`
                 : "Unable to compute"}
@@ -377,7 +573,7 @@ export default async function AdminDashboardPage({
               Total Products
             </span>
             <div className="mt-2 font-mono text-3xl font-black text-slate-900">
-              {!productsErr ? (allProducts || []).length : "Error"}
+              {totalProductsCount !== null ? totalProductsCount : "Error"}
             </div>
             <p className="mt-2 text-xs font-semibold text-[#323C4B]">
               Manage catalogue &rarr;
@@ -387,7 +583,7 @@ export default async function AdminDashboardPage({
           <Link
             href="/admin/products?filter=low_stock"
             className={`rounded-2xl border p-5 shadow-xs transition-all ${
-              lowStockProducts.length > 0
+              lowStockCount !== null && lowStockCount > 0
                 ? "border-amber-200 bg-amber-50/40 hover:border-amber-400"
                 : "border-slate-200 bg-white hover:border-[#323C4B]"
             }`}
@@ -396,7 +592,7 @@ export default async function AdminDashboardPage({
               Low Stock Alerts
             </span>
             <div className="mt-2 font-mono text-3xl font-black text-slate-900">
-              {!productsErr ? lowStockProducts.length : "Error"}
+              {lowStockCount !== null ? lowStockCount : "Error"}
             </div>
             <p className="mt-2 text-xs font-semibold text-amber-800">
               1–10 units remaining &rarr;
@@ -406,7 +602,7 @@ export default async function AdminDashboardPage({
           <Link
             href="/admin/products?filter=out_of_stock"
             className={`rounded-2xl border p-5 shadow-xs transition-all ${
-              outOfStockProducts.length > 0
+              outOfStockCount !== null && outOfStockCount > 0
                 ? "border-red-200 bg-red-50/50 hover:border-red-400"
                 : "border-slate-200 bg-white hover:border-[#323C4B]"
             }`}
@@ -415,7 +611,7 @@ export default async function AdminDashboardPage({
               Out of Stock
             </span>
             <div className="mt-2 font-mono text-3xl font-black text-slate-900">
-              {!productsErr ? outOfStockProducts.length : "Error"}
+              {outOfStockCount !== null ? outOfStockCount : "Error"}
             </div>
             <p className="mt-2 text-xs font-semibold text-red-700">
               0 units available &rarr;
@@ -430,7 +626,7 @@ export default async function AdminDashboardPage({
               Categories &amp; Aisles
             </span>
             <div className="mt-2 font-mono text-3xl font-black text-slate-900">
-              {!catErr ? categoriesCount ?? 0 : "Error"}
+              {categoriesCount !== null ? categoriesCount : "Error"}
             </div>
             <p className="mt-2 text-xs font-semibold text-[#323C4B]">
               Organise aisles &rarr;
@@ -454,7 +650,13 @@ export default async function AdminDashboardPage({
               Open full activity log &rarr;
             </Link>
           </div>
-          <AdminActivityFeed events={activityEvents} showFilters={true} />
+          {activityQueryErr ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-800">
+              Could not load activity events: {activityQueryErr}
+            </div>
+          ) : (
+            <AdminActivityFeed events={activityEvents} showFilters={true} />
+          )}
         </div>
 
         {/* Right Side: Privacy-Safe Basket Demand & Urgent Stock Alerts */}
@@ -475,14 +677,25 @@ export default async function AdminDashboardPage({
               </span>
             </div>
 
-            {topCartToday.length === 0 ? (
+            {cartQueryErr ? (
+              <p className="mt-4 text-xs font-medium text-red-700">
+                Unavailable — could not load cart demand ({cartQueryErr}).
+              </p>
+            ) : activityPendingMigration ? (
+              <p className="mt-4 text-xs text-amber-800">
+                Pending migration 004.
+              </p>
+            ) : topCartToday.length === 0 ? (
               <p className="mt-4 text-xs text-slate-500">
                 No cart additions logged today yet.
               </p>
             ) : (
               <ul className="mt-3 divide-y divide-slate-100 text-xs">
                 {topCartToday.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between py-2.5 gap-2">
+                  <li
+                    key={c.id}
+                    className="flex items-center justify-between py-2.5 gap-2"
+                  >
                     <Link
                       href={`/admin/products/${c.product_id}/edit`}
                       className="font-semibold text-slate-800 hover:text-[#323C4B] hover:underline truncate"
@@ -512,40 +725,39 @@ export default async function AdminDashboardPage({
               </Link>
             </div>
 
-            {productsErr ? (
+            {stockAttentionRes.error ? (
               <p className="mt-4 text-xs text-red-700 font-medium">
-                Unavailable — could not verify product stock ({productsErr.message}).
+                Unavailable — could not verify product stock (
+                {stockAttentionRes.error.message}).
               </p>
-            ) : outOfStockProducts.length === 0 && lowStockProducts.length === 0 ? (
+            ) : stockAttentionItems.length === 0 ? (
               <p className="mt-4 text-xs text-emerald-700 font-medium">
                 All products are well stocked (above 10 units).
               </p>
             ) : (
               <ul className="mt-3 divide-y divide-slate-100 text-xs">
-                {[...outOfStockProducts, ...lowStockProducts]
-                  .slice(0, 6)
-                  .map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex items-center justify-between py-2.5 gap-2"
+                {stockAttentionItems.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between py-2.5 gap-2"
+                  >
+                    <Link
+                      href={`/admin/products/${p.id}/edit`}
+                      className="font-medium text-slate-800 hover:underline truncate"
                     >
-                      <Link
-                        href={`/admin/products/${p.id}/edit`}
-                        className="font-medium text-slate-800 hover:underline truncate"
-                      >
-                        {p.name}
-                      </Link>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                          p.stock_quantity <= 0
-                            ? "bg-red-100 text-red-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}
-                      >
-                        {p.stock_quantity} left
-                      </span>
-                    </li>
-                  ))}
+                      {p.name}
+                    </Link>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        classifyStockStatus(p.stock_quantity) === "out_of_stock"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {p.stock_quantity} left
+                    </span>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
@@ -557,9 +769,16 @@ export default async function AdminDashboardPage({
                 <h3 className="text-sm font-bold text-[#323C4B]">
                   Customer Enquiries
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {newContactCount} unread message{newContactCount !== 1 ? "s" : ""} from Contact Us
-                </p>
+                {contactErr ? (
+                  <p className="text-xs font-medium text-red-700 mt-0.5">
+                    Unavailable — query error ({contactErr.message})
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {contactRes.count ?? 0} unread message
+                    {(contactRes.count ?? 0) !== 1 ? "s" : ""} from Contact Us
+                  </p>
+                )}
               </div>
               <Link
                 href="/admin/activity#enquiries"
@@ -572,7 +791,7 @@ export default async function AdminDashboardPage({
         </div>
       </div>
 
-      {/* Section 4: Recent Orders Snapshot */}
+      {/* Section 4: Recent Orders Snapshot (No unnecessary customer PII on dashboard overview) */}
       <section aria-labelledby="recent-orders-heading" className="space-y-3">
         <div className="flex items-center justify-between">
           <h2
@@ -595,7 +814,7 @@ export default async function AdminDashboardPage({
               <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Order Ref</th>
-                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Placed (UK)</th>
                   <th className="px-4 py-3">Method</th>
                   <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Fulfilment</th>
@@ -604,7 +823,13 @@ export default async function AdminDashboardPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {recentOrders.length === 0 ? (
+                {recentOrdersRes.error ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6 text-center text-xs font-medium text-red-700">
+                      Could not load recent orders: {recentOrdersRes.error.message}
+                    </td>
+                  </tr>
+                ) : recentOrders.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-500">
                       No orders have been placed yet.
@@ -616,8 +841,8 @@ export default async function AdminDashboardPage({
                       <td className="px-4 py-3 font-mono text-xs font-bold text-[#323C4B]">
                         {order.order_number}
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-800">
-                        {order.customer_name}
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {formatLondonShortDateTime(order.created_at)}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600 capitalize">
                         {order.fulfilment_type}
@@ -628,8 +853,8 @@ export default async function AdminDashboardPage({
                             order.payment_status === "paid"
                               ? "bg-emerald-100 text-emerald-800"
                               : order.payment_status === "refunded"
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-slate-100 text-slate-700"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-slate-100 text-slate-700"
                           }`}
                         >
                           {order.payment_status}
@@ -647,6 +872,108 @@ export default async function AdminDashboardPage({
                           className="text-xs font-bold text-[#323C4B] hover:underline"
                         >
                           Inspect &rarr;
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 4b: Product Catalogue Overview (Latest Products Snapshot) */}
+      <section aria-labelledby="catalogue-snapshot-heading" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2
+            id="catalogue-snapshot-heading"
+            className="text-sm font-extrabold uppercase tracking-wider text-[#323C4B]"
+          >
+            Product Catalogue Overview
+          </h2>
+          <Link
+            href="/admin/products"
+            className="text-xs font-bold text-[#323C4B] hover:underline"
+          >
+            Manage all products &rarr;
+          </Link>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Product</th>
+                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3 text-right">Price</th>
+                  <th className="px-4 py-3 text-right">Stock</th>
+                  <th className="px-4 py-3">Availability &amp; Age Rule</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {productSnapshotRes.error ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-xs font-medium text-red-700">
+                      Could not load product overview: {productSnapshotRes.error.message}
+                    </td>
+                  </tr>
+                ) : productSnapshotItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-500">
+                      No products found in catalogue yet.
+                    </td>
+                  </tr>
+                ) : (
+                  productSnapshotItems.map((prod) => (
+                    <tr key={prod.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 text-xs font-bold text-slate-900">
+                        {prod.name}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {(prod.category_id && categoryNameById[prod.category_id]) ||
+                          "Uncategorised"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-xs font-bold text-slate-900">
+                        £{Number(prod.price).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            classifyStockStatus(prod.stock_quantity) === "out_of_stock"
+                              ? "bg-red-100 text-red-800"
+                              : classifyStockStatus(prod.stock_quantity) === "low_stock"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {prod.stock_quantity} units
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs space-x-1.5">
+                        <span
+                          className={`inline-flex rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                            prod.is_available
+                              ? "bg-slate-100 text-slate-700"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {prod.is_available ? "Active" : "Hidden"}
+                        </span>
+                        {prod.is_age_restricted && (
+                          <span className="inline-flex rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-red-800">
+                            18+ Challenge 25
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/admin/products/${prod.id}/edit`}
+                          className="text-xs font-bold text-[#323C4B] hover:underline"
+                        >
+                          Edit &rarr;
                         </Link>
                       </td>
                     </tr>
