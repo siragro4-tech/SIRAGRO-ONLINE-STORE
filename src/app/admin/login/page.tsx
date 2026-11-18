@@ -53,7 +53,7 @@ export default async function AdminLoginPage() {
                 SIRAGRO Store Control Centre
               </h1>
               <p className="text-xs font-medium text-slate-300">
-                Administrator Sign In (<span className="font-mono">/admin</span>)
+                Administrator Sign In
               </p>
             </div>
           </div>
