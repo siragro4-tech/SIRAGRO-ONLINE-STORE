@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { logoutAction } from "@/app/auth/actions";
+import { useEffect, useState } from "react";
+import { adminLogoutAction } from "@/app/admin/actions";
 import { Logo } from "@/components/layout/Logo";
 
 interface AdminSidebarProps {
@@ -61,6 +61,24 @@ const NAV_ITEMS = [
     ),
   },
   {
+    name: "Payments",
+    href: "/admin/payments",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+      </svg>
+    ),
+  },
+  {
+    name: "Buyers & Accounts",
+    href: "/admin/customers",
+    icon: (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    ),
+  },
+  {
     name: "CSV Import",
     href: "/admin/import",
     icon: (
@@ -89,22 +107,35 @@ export function AdminSidebar({
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsOpen(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
   return (
     <>
-      {/* Mobile top toggle bar */}
+      {/* Mobile & tablet top toggle bar */}
       <div className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#242c37] bg-[#323C4B] px-4 text-white lg:hidden">
-        <Link href="/admin" className="flex items-center gap-2.5">
+        <Link href="/admin" className="flex items-center gap-2.5 min-w-0">
           <Logo size={34} dark />
-          <div>
-            <span className="block text-sm font-black tracking-wide leading-tight">
+          <div className="min-w-0">
+            <span className="block truncate text-sm font-black tracking-wide leading-tight">
               SIRAGRO
             </span>
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+            <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-slate-300">
               Admin Portal
             </span>
           </div>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {unreadAlertsCount > 0 && (
             <Link
               href="/admin/activity"
@@ -119,6 +150,7 @@ export function AdminSidebar({
             onClick={() => setIsOpen(!isOpen)}
             className="rounded-lg p-2 text-slate-200 hover:bg-[#242c37] focus:outline-none focus:ring-2 focus:ring-white"
             aria-label="Toggle admin navigation menu"
+            aria-controls="admin-sidebar-drawer"
             aria-expanded={isOpen}
           >
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
@@ -132,105 +164,125 @@ export function AdminSidebar({
         </div>
       </div>
 
-      {/* Backdrop for mobile */}
+      {/* Backdrop for mobile drawer */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-black/55 backdrop-blur-xs lg:hidden"
           onClick={() => setIsOpen(false)}
+          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar container */}
+      {/* Responsive Sidebar Container (Drawer < lg, Sticky Full-Height >= lg) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col justify-between border-r border-slate-200 bg-white transition-transform lg:static lg:translate-x-0 ${
+        id="admin-sidebar-drawer"
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[85vw] shrink-0 flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out lg:sticky lg:top-0 lg:z-auto lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div>
-          {/* SIRAGRO Brand Header */}
-          <div className="flex items-center gap-3 bg-[#323C4B] px-5 py-5 text-white">
-            <Logo size={40} dark />
+        {/* SIRAGRO Brand Header */}
+        <div className="shrink-0 flex items-center justify-between gap-3 bg-[#323C4B] px-5 py-4 text-white">
+          <Link
+            href="/admin"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 min-w-0"
+          >
+            <Logo size={38} dark />
             <div className="min-w-0">
-              <div className="font-black tracking-wide text-white leading-tight">
+              <div className="font-black tracking-wide text-white leading-tight truncate">
                 SIRAGRO
               </div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-300 truncate">
                 Store Admin
               </div>
             </div>
-          </div>
+          </Link>
 
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1" aria-label="Admin Navigation">
-            {NAV_ITEMS.map((item) => {
-              const isActive =
-                item.href === "/admin"
-                  ? pathname === "/admin"
-                  : pathname.startsWith(item.href);
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className={`group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
-                    isActive
-                      ? "bg-[#323C4B] text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-[#323C4B]"
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    <span
-                      className={
-                        isActive
-                          ? "text-white"
-                          : "text-slate-400 group-hover:text-[#323C4B]"
-                      }
-                    >
-                      {item.icon}
-                    </span>
-                    {item.name}
-                  </span>
-
-                  {item.badge && unreadAlertsCount > 0 && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        isActive
-                          ? "bg-white text-[#323C4B]"
-                          : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {unreadAlertsCount}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="rounded-lg p-1.5 text-slate-200 hover:bg-[#242c37] lg:hidden"
+            aria-label="Close admin sidebar"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* Footer: User profile, link to storefront & logout */}
-        <div className="border-t border-slate-200 p-4 space-y-3 bg-slate-50/70">
+        {/* Independently scrollable nav links */}
+        <nav
+          className="flex-1 overflow-y-auto px-3.5 py-3 space-y-1"
+          aria-label="Admin Navigation"
+        >
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              item.href === "/admin"
+                ? pathname === "/admin"
+                : pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className={`group flex items-center justify-between rounded-xl px-3.5 py-2 text-sm font-semibold transition-all ${
+                  isActive
+                    ? "bg-[#323C4B] text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-[#323C4B]"
+                }`}
+              >
+                <span className="flex items-center gap-3 min-w-0">
+                  <span
+                    className={
+                      isActive
+                        ? "text-white shrink-0"
+                        : "text-slate-400 group-hover:text-[#323C4B] shrink-0"
+                    }
+                  >
+                    {item.icon}
+                  </span>
+                  <span className="truncate">{item.name}</span>
+                </span>
+
+                {item.badge && unreadAlertsCount > 0 && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-bold shrink-0 ${
+                      isActive
+                        ? "bg-white text-[#323C4B]"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {unreadAlertsCount}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Pinned Footer: User profile, link to storefront & logout */}
+        <div className="shrink-0 border-t border-slate-200 p-3.5 space-y-2.5 bg-slate-50/70">
           <Link
             href="/"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-[#323C4B] hover:bg-slate-100 transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
             </svg>
             Open Storefront
           </Link>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-2.5">
             <p className="truncate text-xs font-bold text-slate-900">
               {adminName || "Store Admin"}
             </p>
             <p className="truncate text-[11px] text-slate-500">{userEmail}</p>
           </div>
 
-          <form action={logoutAction}>
+          <form action={adminLogoutAction}>
             <button
               type="submit"
               className="w-full rounded-xl bg-slate-200/70 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"

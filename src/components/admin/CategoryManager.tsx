@@ -178,11 +178,10 @@ export function CategoryManager({
       {/* Global Feedback message */}
       {feedback && (
         <div
-          className={`rounded-lg p-4 text-sm font-medium ${
-            feedback.type === "success"
-              ? "bg-green-50 text-green-800 border border-green-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
+          className={`rounded-lg p-4 text-sm font-medium ${feedback.type === "success"
+            ? "bg-green-50 text-green-800 border border-green-200"
+            : "bg-red-50 text-red-800 border border-red-200"
+            }`}
         >
           {feedback.text}
         </div>
@@ -248,11 +247,10 @@ export function CategoryManager({
                         type="button"
                         onClick={() => handleToggleStatus(cat)}
                         disabled={loading}
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
-                          cat.is_active
-                            ? "bg-green-100 text-green-800 hover:bg-green-200"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${cat.is_active
+                          ? "bg-green-100 text-green-800 hover:bg-green-200"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
                         title="Click to toggle status"
                       >
                         {cat.is_active ? "Active" : "Hidden"}

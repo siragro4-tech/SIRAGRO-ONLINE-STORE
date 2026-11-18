@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { adminLogoutAction } from "@/app/admin/actions";
 
 export const metadata: Metadata = {
   title: "Access Denied (403)",
@@ -42,9 +43,17 @@ export default function ForbiddenPage() {
       </p>
 
       <div className="mt-8 flex flex-col sm:flex-row gap-3">
+        <form action={adminLogoutAction}>
+          <button
+            type="submit"
+            className="inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95"
+          >
+            Sign Out &amp; Use Admin Account
+          </button>
+        </form>
         <Link
           href="/"
-          className="inline-flex items-center justify-center rounded-xl bg-[#323C4B] hover:bg-[#242c37] px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95"
+          className="inline-flex items-center justify-center rounded-xl border-2 border-slate-300 bg-white px-6 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors"
         >
           Return to Store
         </Link>

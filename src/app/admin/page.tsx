@@ -4,6 +4,8 @@ import { requireAdminPage } from "@/lib/admin-auth";
 import {
   calculateRevenueSummary,
   classifyStockStatus,
+  formatLondonShortDateTime,
+  isMissingSchemaError,
   type SalesPeriod,
 } from "@/lib/admin-rules";
 import {
@@ -41,21 +43,6 @@ function getLondonDateKey(date: Date): string {
   }).format(date);
 }
 
-function formatLondonShortDateTime(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/London",
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
-}
-
 function getPeriodQueryStartIso(period: SalesPeriod, now: Date): string | null {
   const copy = new Date(now);
   if (period === "today") {
@@ -71,16 +58,6 @@ function getPeriodQueryStartIso(period: SalesPeriod, now: Date): string | null {
     return copy.toISOString();
   }
   return null;
-}
-
-function isMissingSchemaError(message?: string | null): boolean {
-  if (!message) return false;
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("does not exist") ||
-    lower.includes("schema cache") ||
-    lower.includes("could not find")
-  );
 }
 
 export default async function AdminDashboardPage({
@@ -113,6 +90,8 @@ export default async function AdminDashboardPage({
     periodOrdersRes,
     todayOrdersRes,
     awaitingCountRes,
+    completedCountRes,
+    buyersCountRes,
     recentOrdersRes,
     totalProductsRes,
     lowStockCountRes,
@@ -141,6 +120,14 @@ export default async function AdminDashboardPage({
         "ready_for_pickup",
         "out_for_delivery",
       ]),
+    supabase
+      .from("orders")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["delivered", "collected"]),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "customer"),
     supabase
       .from("orders")
       .select(
@@ -200,6 +187,16 @@ export default async function AdminDashboardPage({
   if (awaitingCountRes.error) {
     queryErrors.push(
       `Awaiting fulfilment query failed: ${awaitingCountRes.error.message}`
+    );
+  }
+  if (completedCountRes.error) {
+    queryErrors.push(
+      `Completed orders query failed: ${completedCountRes.error.message}`
+    );
+  }
+  if (buyersCountRes.error) {
+    queryErrors.push(
+      `Buyers count query failed: ${buyersCountRes.error.message}`
     );
   }
   if (recentOrdersRes.error) {
@@ -348,6 +345,12 @@ export default async function AdminDashboardPage({
   const awaitingFulfilmentCount = !awaitingCountRes.error
     ? awaitingCountRes.count ?? 0
     : null;
+  const completedOrdersCount = !completedCountRes.error
+    ? completedCountRes.count ?? 0
+    : null;
+  const registeredBuyersCount = !buyersCountRes.error
+    ? buyersCountRes.count ?? 0
+    : null;
 
   const recentOrders = recentOrdersRes.data || [];
   const totalProductsCount = !totalProductsRes.error
@@ -376,16 +379,34 @@ export default async function AdminDashboardPage({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Link
+            href="/admin/orders?view=completed"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2 text-xs sm:text-sm font-bold text-emerald-900 hover:bg-emerald-100 transition-colors"
+          >
+            Completed Orders ({completedOrdersCount !== null ? completedOrdersCount : "Error"})
+          </Link>
+          <Link
+            href="/admin/customers"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-[#323C4B] hover:bg-slate-50 transition-colors shadow-2xs"
+          >
+            Buyers ({registeredBuyersCount !== null ? registeredBuyersCount : "Error"})
+          </Link>
+          <Link
+            href="/admin/payments"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-[#323C4B] hover:bg-slate-50 transition-colors shadow-2xs"
+          >
+            Payments
+          </Link>
           <Link
             href="/admin/orders"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-[#323C4B] hover:bg-slate-50 transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-bold text-[#323C4B] hover:bg-slate-50 transition-colors shadow-2xs"
           >
             Orders Queue
           </Link>
           <Link
             href="/admin/products/new"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#323C4B] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#242c37] transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#323C4B] px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-[#242c37] transition-colors"
           >
             <svg
               className="h-4 w-4"

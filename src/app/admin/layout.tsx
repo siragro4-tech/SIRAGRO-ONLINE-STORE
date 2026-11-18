@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isAdminRole } from "@/lib/admin-rules";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -25,9 +24,9 @@ export default async function AdminLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If not authenticated, redirect to login
+  // Allow /admin/login cleanly when unauthenticated; every protected page enforces requireAdminPage().
   if (!user) {
-    redirect("/login?redirectTo=/admin");
+    return <>{children}</>;
   }
 
   // Check admin role in database
@@ -60,13 +59,13 @@ export default async function AdminLayout({
       : profile.first_name || "Administrator";
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 lg:flex-row">
+    <div className="flex min-h-dvh flex-col bg-slate-50 lg:flex-row">
       <AdminSidebar
         userEmail={profile.email}
         adminName={adminName}
         unreadAlertsCount={unreadAlertsCount}
       />
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
         <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>

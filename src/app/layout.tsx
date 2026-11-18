@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { StorefrontShell } from "@/components/layout/StorefrontShell";
 import { ScrollEffects } from "@/components/effects/ScrollEffects";
 import { getBasket } from "@/lib/basket";
 
@@ -13,6 +14,13 @@ export const metadata: Metadata = {
   description:
     "Shop groceries, fresh produce, drinks, snacks and household essentials online. Home delivery and in-store collection near UB3.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  },
   openGraph: {
     type: "website",
     locale: "en_GB",
@@ -41,14 +49,13 @@ export default async function RootLayout({
           Skip to main content
         </a>
 
-        <Header initialItemCount={basketCount} />
-        <ScrollEffects />
-
-        <main id="main-content" className="flex-1">
+        <StorefrontShell
+          header={<Header initialItemCount={basketCount} />}
+          scrollEffects={<ScrollEffects />}
+          footer={<Footer />}
+        >
           {children}
-        </main>
-
-        <Footer />
+        </StorefrontShell>
       </body>
     </html>
   );

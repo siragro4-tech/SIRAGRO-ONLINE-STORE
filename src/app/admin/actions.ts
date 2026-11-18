@@ -1,7 +1,74 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdminAction } from "@/lib/admin-auth";
+import { isAdminRole, sanitizeAdminRedirect } from "@/lib/admin-rules";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+export type AdminLoginResult = {
+  error?: string;
+};
+
+/**
+ * Authenticates an administrator through /admin/login and strictly rejects non-admin accounts.
+ */
+export async function adminLoginAction(
+  prevState: AdminLoginResult | null,
+  formData: FormData
+): Promise<AdminLoginResult> {
+  const email = formData.get("email")?.toString().trim() || "";
+  const password = formData.get("password")?.toString() || "";
+  const redirectTo = sanitizeAdminRedirect(
+    formData.get("redirectTo")?.toString()
+  );
+
+  if (!email || !password) {
+    return { error: "Please enter both your admin email address and password." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return {
+      error:
+        error?.message ||
+        "Sign in failed. Please check your administrator email and password.",
+    };
+  }
+
+  // Verify database role explicitly — customer accounts are signed back out immediately
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", data.user.id)
+    .single();
+
+  if (profileErr || !profile || !isAdminRole(profile.role)) {
+    await supabase.auth.signOut();
+    return {
+      error:
+        "Access Denied: This email does not have administrator permissions to access /admin.",
+    };
+  }
+
+  revalidatePath("/", "layout");
+  redirect(redirectTo);
+}
+
+/**
+ * Signs out the current session and returns to the /admin/login portal.
+ */
+export async function adminLogoutAction() {
+  const supabase = await createServerSupabaseClient();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/admin/login");
+}
 
 export async function markActivityReadAction(
   eventId: string

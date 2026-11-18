@@ -119,11 +119,11 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
 
       {/* ── Layer 2: Main Storefront Bar ── */}
       <div className="bg-[#323C4B] border-b border-[#414e60]">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 sm:gap-4 px-3 py-2.5 sm:px-6 lg:px-8">
 
           {/* Store Logo & Signboard Name */}
-          <Link href="/" className="flex flex-shrink-0 items-center gap-3 group" aria-label="SIRAGRO home">
-            <Logo size={52} dark />
+          <Link href="/" className="flex flex-shrink-0 items-center gap-2.5 sm:gap-3 group" aria-label="SIRAGRO home">
+            <Logo size={46} dark />
             <div className="hidden sm:block leading-tight">
               <div className="fascia-3d-text text-2xl font-black tracking-wider text-white uppercase">
                 SIRAGRO
@@ -139,24 +139,24 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
             <HeaderSearchBar />
           </div>
 
-          {/* Account Profile OR Clean Sign In Pill */}
+          {/* Account Profile OR Clean Sign In Pill (responsive across all screens) */}
           {userEmail ? (
             /* ONLY shows when user has created an account / logged in */
             <Link
               href="/account"
-              className="hidden md:flex items-center gap-2 rounded-lg px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20 hover:scale-105"
+              className="flex shrink-0 items-center gap-2 rounded-lg px-2.5 sm:px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20 hover:scale-105"
               aria-label="My account"
             >
               <div className="w-6 h-6 rounded-full bg-white text-[#323C4B] font-black text-xs flex items-center justify-center uppercase shadow-sm">
                 {userEmail.charAt(0)}
               </div>
-              <span className="text-xs font-bold">My Account</span>
+              <span className="hidden md:inline text-xs font-bold">My Account</span>
             </Link>
           ) : (
             /* Clean Sign In action when not logged in */
             <Link
               href="/login"
-              className="hidden md:flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-all hover:scale-105"
+              className="hidden sm:flex shrink-0 items-center gap-1.5 rounded-lg px-3 sm:px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-all hover:scale-105"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
@@ -270,6 +270,7 @@ export function Header({ initialItemCount = 0 }: HeaderProps) {
         onClose={() => setMobileOpen(false)}
         links={NAV_LINKS}
         itemCount={itemCount}
+        userEmail={userEmail}
       />
     </header>
   );

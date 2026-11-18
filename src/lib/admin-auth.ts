@@ -4,7 +4,7 @@ import { isAdminRole } from "@/lib/admin-rules";
 
 /**
  * Enforces admin authentication & role verification on Server Component pages.
- * Redirects unauthenticated visitors to /login and non-admin users to /admin/forbidden.
+ * Redirects unauthenticated visitors to /admin/login and non-admin users to /admin/forbidden.
  */
 export async function requireAdminPage(redirectPath: string = "/admin") {
   const supabase = await createServerSupabaseClient();
@@ -13,7 +13,7 @@ export async function requireAdminPage(redirectPath: string = "/admin") {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect(`/login?redirectTo=${encodeURIComponent(redirectPath)}`);
+    redirect(`/admin/login?redirectTo=${encodeURIComponent(redirectPath)}`);
   }
 
   const { data: profile } = await supabase

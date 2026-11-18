@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { logoutAction } from "@/app/auth/actions";
 import { Logo } from "./Logo";
 
 const CATEGORIES = [
@@ -20,9 +21,16 @@ interface MobileMenuProps {
   onClose: () => void;
   links: ReadonlyArray<{ href: string; label: string }>;
   itemCount?: number;
+  userEmail?: string | null;
 }
 
-export function MobileMenu({ open, onClose, itemCount = 0 }: MobileMenuProps) {
+export function MobileMenu({
+  open,
+  onClose,
+  links,
+  itemCount = 0,
+  userEmail = null,
+}: MobileMenuProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -61,10 +69,10 @@ export function MobileMenu({ open, onClose, itemCount = 0 }: MobileMenuProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
-        className="fixed inset-y-0 left-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto shadow-2xl bg-[#323C4B] text-white"
+        className="fixed inset-y-0 left-0 z-50 flex h-dvh w-full max-w-[85vw] sm:max-w-sm flex-col shadow-2xl bg-[#323C4B] text-white"
       >
         {/* Panel header */}
-        <div className="flex items-center justify-between border-b border-[#414e60] px-4 py-4 bg-[#242c37]">
+        <div className="shrink-0 flex items-center justify-between border-b border-[#414e60] px-4 py-4 bg-[#242c37]">
           <Link href="/" onClick={onClose} className="flex items-center gap-3">
             <Logo size={42} dark />
             <div className="text-white leading-tight">
@@ -111,57 +119,104 @@ export function MobileMenu({ open, onClose, itemCount = 0 }: MobileMenuProps) {
           </Link>
         </div>
 
-        {/* Categories */}
-        <div className="flex-1 px-4 py-4">
-          <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/70">
-            Shop by Department
-          </p>
-          <nav className="space-y-1">
-            <Link
-              href="/shop"
-              onClick={onClose}
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-black uppercase tracking-wider text-white bg-white/10 hover:bg-white/20 transition-colors"
-            >
-              🛒 All Departments
-            </Link>
-            {CATEGORIES.map((cat) => (
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+          <div>
+            <p className="mb-3 text-xs font-black uppercase tracking-widest text-white/70">
+              Shop by Department
+            </p>
+            <nav className="space-y-1">
               <Link
-                key={cat.slug}
-                href={`/category/${cat.slug}`}
+                href="/shop"
                 onClick={onClose}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-bold text-white/90 hover:text-white hover:bg-white/10 transition-colors"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-black uppercase tracking-wider text-white bg-white/10 hover:bg-white/20 transition-colors"
               >
-                <span className="text-base">{cat.emoji}</span>
-                <span>{cat.label}</span>
+                🛒 All Departments
               </Link>
-            ))}
-          </nav>
+              {CATEGORIES.map((cat) => (
+                <Link
+                  key={cat.slug}
+                  href={`/category/${cat.slug}`}
+                  onClick={onClose}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-bold text-white/90 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <span className="text-base">{cat.emoji}</span>
+                  <span>{cat.label}</span>
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          {links.length > 0 && (
+            <div className="border-t border-[#414e60] pt-4">
+              <p className="mb-2 text-xs font-black uppercase tracking-widest text-white/70">
+                Store Information
+              </p>
+              <nav className="grid grid-cols-2 gap-1.5">
+                {links.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={onClose}
+                    className="rounded-lg px-3 py-2 text-xs font-semibold text-white/85 hover:bg-white/10 hover:text-white transition-colors"
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+          )}
         </div>
 
-        {/* Footer — Sign In & Register only */}
-        <div className="border-t border-[#414e60] p-4 bg-[#242c37]">
-          <div className="grid grid-cols-2 gap-3">
-            <Link
-              href="/login"
-              onClick={onClose}
-              className="flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-sm font-black text-white border border-white/30 hover:bg-white/10 transition-colors"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-              </svg>
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              onClick={onClose}
-              className="flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-sm font-black text-[#323C4B] bg-white hover:bg-white/90 shadow transition-colors"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
-              </svg>
-              Register
-            </Link>
-          </div>
+        {/* Footer — Account session or Sign In & Register */}
+        <div className="shrink-0 border-t border-[#414e60] p-4 bg-[#242c37]">
+          {userEmail ? (
+            <div className="space-y-2.5">
+              <div className="rounded-lg bg-white/10 px-3 py-2 text-xs text-white/90 truncate">
+                Signed in as <strong className="text-white">{userEmail}</strong>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <Link
+                  href="/account"
+                  onClick={onClose}
+                  className="flex items-center justify-center rounded-lg py-2.5 px-3 text-xs font-black text-[#323C4B] bg-white hover:bg-white/90 shadow transition-colors"
+                >
+                  My Account
+                </Link>
+                <form action={logoutAction}>
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg py-2.5 px-3 text-xs font-black text-white border border-white/30 hover:bg-white/10 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <Link
+                href="/login"
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-sm font-black text-white border border-white/30 hover:bg-white/10 transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+                Sign In
+              </Link>
+              <Link
+                href="/register"
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-sm font-black text-[#323C4B] bg-white hover:bg-white/90 shadow transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                </svg>
+                Register
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </>

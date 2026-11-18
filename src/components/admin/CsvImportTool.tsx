@@ -161,22 +161,20 @@ export function CsvImportTool() {
           <button
             type="button"
             onClick={() => setActiveTab("file")}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
-              activeTab === "file"
-                ? "border-green-700 text-green-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "file"
+              ? "border-green-700 text-green-700"
+              : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
           >
             Upload .CSV File
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("paste")}
-            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
-              activeTab === "paste"
-                ? "border-green-700 text-green-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
+            className={`border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "paste"
+              ? "border-green-700 text-green-700"
+              : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
           >
             Paste CSV Text
           </button>
@@ -332,22 +330,20 @@ export function CsvImportTool() {
       {/* Outcome / Result Banner */}
       {result && (
         <div
-          className={`rounded-xl border p-6 shadow-xs space-y-4 ${
-            result.errors.length === 0
-              ? "border-green-200 bg-green-50/50"
-              : "border-amber-200 bg-amber-50/40"
-          }`}
+          className={`rounded-xl border p-6 shadow-xs space-y-4 ${result.errors.length === 0
+            ? "border-green-200 bg-green-50/50"
+            : "border-amber-200 bg-amber-50/40"
+            }`}
         >
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-gray-900">
               {result.errors.length === 0 ? "Import Completed Successfully" : "Import Completed with Notices"}
             </h3>
             <span
-              className={`rounded-full px-3 py-1 text-xs font-bold ${
-                result.errors.length === 0
-                  ? "bg-green-100 text-green-800"
-                  : "bg-amber-100 text-amber-800"
-              }`}
+              className={`rounded-full px-3 py-1 text-xs font-bold ${result.errors.length === 0
+                ? "bg-green-100 text-green-800"
+                : "bg-amber-100 text-amber-800"
+                }`}
             >
               {result.importedCount + result.updatedCount} Successful
             </span>

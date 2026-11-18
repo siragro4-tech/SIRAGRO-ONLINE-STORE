@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdminAction } from "@/lib/admin-auth";
-import { validateProductImageFile } from "@/lib/admin-rules";
+import { normalizeProductPrice, validateProductImageFile } from "@/lib/admin-rules";
 import { recordInventoryAdjustment } from "@/lib/activity";
 import {
   deleteProductImageFromStorage,
@@ -486,6 +486,47 @@ export async function quickUpdateStockAction(
   revalidatePath("/admin");
   revalidatePath("/shop");
   return { success: true, message: "Stock updated successfully." };
+}
+
+/**
+ * Quick inline price update from the /admin/products table.
+ */
+export async function quickUpdatePriceAction(
+  productId: string,
+  rawPrice: number
+): Promise<ProductActionResult> {
+  const auth = await requireAdminAction();
+  if (!auth.authorized) {
+    return { success: false, error: auth.error };
+  }
+
+  const normalizedPrice = normalizeProductPrice(rawPrice);
+  if (normalizedPrice === null) {
+    return {
+      success: false,
+      error: "Price must be a valid non-negative GBP amount (0.00 or higher).",
+    };
+  }
+
+  const { error } = await auth.supabase
+    .from("products")
+    .update({
+      price: normalizedPrice,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", productId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/products");
+  revalidatePath("/admin");
+  revalidatePath("/shop");
+  return {
+    success: true,
+    message: `Price updated to £${normalizedPrice.toFixed(2)}.`,
+  };
 }
 
 /**

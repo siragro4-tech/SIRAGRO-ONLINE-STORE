@@ -15,8 +15,11 @@ export async function updateSession(request: NextRequest) {
 
   // If Supabase credentials are not configured yet, allow non-admin paths through in development
   if (!supabaseUrl || !supabaseAnonKey) {
-    if (request.nextUrl.pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/login", request.url));
+    if (
+      request.nextUrl.pathname.startsWith("/admin") &&
+      request.nextUrl.pathname !== "/admin/login"
+    ) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
     }
     return supabaseResponse;
   }
@@ -50,10 +53,14 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // 1. Guard /admin routes
-  if (pathname.startsWith("/admin") && pathname !== "/admin/forbidden") {
+  if (
+    pathname.startsWith("/admin") &&
+    pathname !== "/admin/forbidden" &&
+    pathname !== "/admin/login"
+  ) {
     if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
+      url.pathname = "/admin/login";
       url.searchParams.set("redirectTo", pathname);
       return NextResponse.redirect(url);
     }
@@ -70,6 +77,20 @@ export async function updateSession(request: NextRequest) {
       url.pathname = "/admin/forbidden";
       return NextResponse.redirect(url);
     }
+  }
+
+  // 1b. If already signed in on /admin/login, send verified admins to /admin and shoppers to /admin/forbidden
+  if (pathname === "/admin/login" && user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const url = request.nextUrl.clone();
+    url.pathname = profile?.role === "admin" ? "/admin" : "/admin/forbidden";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
   // 2. Guard /account routes (must be logged in)

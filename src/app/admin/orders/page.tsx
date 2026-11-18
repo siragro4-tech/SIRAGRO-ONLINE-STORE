@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/admin-auth";
+import { formatLondonDateTimeWithYear } from "@/lib/admin-rules";
 import type { Database } from "@/types/database.types";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ type FulfilmentType = Database["public"]["Tables"]["orders"]["Row"]["fulfilment_
 interface OrdersPageProps {
   searchParams: Promise<{
     page?: string;
+    view?: string;
     status?: string;
     fulfilment?: string;
     payment?: string;
@@ -24,6 +26,13 @@ interface OrdersPageProps {
 }
 
 const PAGE_SIZE = 15;
+const ACTIVE_STATUSES: OrderStatusType[] = [
+  "pending",
+  "processing",
+  "ready_for_pickup",
+  "out_for_delivery",
+];
+const COMPLETED_STATUSES: OrderStatusType[] = ["delivered", "collected"];
 
 const STATUS_BADGES: Record<string, { label: string; bg: string; text: string; border: string }> = {
   pending: { label: "Pending", bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
@@ -42,25 +51,15 @@ const PAYMENT_BADGES: Record<string, { label: string; bg: string; text: string; 
   failed: { label: "Failed", bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-500" },
 };
 
-function formatLondonDateTime(isoString: string): string {
-  try {
-    return new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/London",
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date(isoString));
-  } catch {
-    return isoString;
-  }
-}
-
 export default async function AdminOrdersPage({ searchParams }: OrdersPageProps) {
   const params = await searchParams;
   const currentPage = Math.max(1, parseInt(params.page || "1", 10) || 1);
+  const viewFilter =
+    params.view === "active" ||
+    params.view === "completed" ||
+    params.view === "cancelled"
+      ? params.view
+      : "all";
   const statusFilter = params.status || "all";
   const fulfilmentFilter = params.fulfilment || "all";
   const paymentFilter = params.payment || "all";
@@ -69,6 +68,24 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const dateTo = params.dateTo || "";
 
   const { supabase } = await requireAdminPage("/admin/orders");
+
+  // Quick-view tab counts (real server head queries)
+  const [allTabRes, activeTabRes, completedTabRes, cancelledTabRes] =
+    await Promise.all([
+      supabase.from("orders").select("id", { count: "exact", head: true }),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .in("status", ACTIVE_STATUSES),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .in("status", COMPLETED_STATUSES),
+      supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "cancelled"),
+    ]);
 
   // Build the query with server-side pagination & filtering
   let query = supabase
@@ -79,9 +96,15 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
     )
     .order("created_at", { ascending: false });
 
-  // Status Filter
+  // Status Filter (explicit status dropdown overrides quick view tab)
   if (statusFilter !== "all") {
     query = query.eq("status", statusFilter as OrderStatusType);
+  } else if (viewFilter === "active") {
+    query = query.in("status", ACTIVE_STATUSES);
+  } else if (viewFilter === "completed") {
+    query = query.in("status", COMPLETED_STATUSES);
+  } else if (viewFilter === "cancelled") {
+    query = query.eq("status", "cancelled");
   }
 
   // Fulfilment Filter
@@ -118,24 +141,84 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
   const totalCount = count || 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  function buildOrdersUrl(overrides: {
+    page?: number;
+    view?: string;
+    status?: string;
+  }): string {
+    const qs = new URLSearchParams();
+    const pg = overrides.page ?? currentPage;
+    const vw = overrides.view !== undefined ? overrides.view : viewFilter;
+    const st = overrides.status !== undefined ? overrides.status : statusFilter;
+
+    if (vw && vw !== "all") qs.set("view", vw);
+    if (st && st !== "all") qs.set("status", st);
+    if (fulfilmentFilter !== "all") qs.set("fulfilment", fulfilmentFilter);
+    if (paymentFilter !== "all") qs.set("payment", paymentFilter);
+    if (searchQuery) qs.set("search", searchQuery);
+    if (dateFrom) qs.set("dateFrom", dateFrom);
+    if (dateTo) qs.set("dateTo", dateTo);
+    if (pg > 1) qs.set("page", String(pg));
+
+    const str = qs.toString();
+    return str ? `/admin/orders?${str}` : "/admin/orders";
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-            Customer Orders
+            Customer Orders &amp; Fulfilment
           </h1>
           <p className="mt-1 text-sm text-gray-600">
-            Real-time grocery &amp; off-licence order queue for SIRAGRO (Hayes Hub: UB3 4NS).
+            Track live orders, update collection/delivery stages, and review completed orders for SIRAGRO (UB3 4NS).
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 border border-blue-200">
-            Total Orders: {totalCount}
+            Matching Orders: {totalCount}
           </span>
         </div>
+      </div>
+
+      {/* Quick View Tabs: All / Active Queue / Completed / Cancelled */}
+      <div className="flex flex-wrap gap-2" role="navigation" aria-label="Order queue views">
+        {[
+          {
+            id: "all",
+            label: `All Orders (${allTabRes.error ? "?" : (allTabRes.count ?? 0)})`,
+          },
+          {
+            id: "active",
+            label: `Active Queue (${activeTabRes.error ? "?" : (activeTabRes.count ?? 0)})`,
+          },
+          {
+            id: "completed",
+            label: `Completed Orders (${completedTabRes.error ? "?" : (completedTabRes.count ?? 0)})`,
+          },
+          {
+            id: "cancelled",
+            label: `Cancelled (${cancelledTabRes.error ? "?" : (cancelledTabRes.count ?? 0)})`,
+          },
+        ].map((tab) => {
+          const isCurrent = statusFilter === "all" && viewFilter === tab.id;
+          return (
+            <Link
+              key={tab.id}
+              href={buildOrdersUrl({ view: tab.id, status: "all", page: 1 })}
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
+                isCurrent
+                  ? "bg-[#323C4B] text-white shadow-xs"
+                  : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Filter & Search Bar */}
@@ -347,7 +430,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
 
                       {/* Date & Time */}
                       <td className="whitespace-nowrap px-4 py-4 text-xs text-gray-600">
-                        {formatLondonDateTime(order.created_at)}
+                        {formatLondonDateTimeWithYear(order.created_at)}
                       </td>
 
                       {/* Customer */}
@@ -426,7 +509,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
             <div className="flex items-center gap-2">
               {currentPage > 1 ? (
                 <Link
-                  href={`/admin/orders?page=${currentPage - 1}&status=${statusFilter}&fulfilment=${fulfilmentFilter}&payment=${paymentFilter}&search=${encodeURIComponent(searchQuery)}&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`}
+                  href={buildOrdersUrl({ page: currentPage - 1 })}
                   className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs"
                 >
                   &larr; Previous
@@ -443,7 +526,7 @@ export default async function AdminOrdersPage({ searchParams }: OrdersPageProps)
 
               {currentPage < totalPages ? (
                 <Link
-                  href={`/admin/orders?page=${currentPage + 1}&status=${statusFilter}&fulfilment=${fulfilmentFilter}&payment=${paymentFilter}&search=${encodeURIComponent(searchQuery)}&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`}
+                  href={buildOrdersUrl({ page: currentPage + 1 })}
                   className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors shadow-2xs"
                 >
                   Next &rarr;

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { notFound } from "next/navigation";
+import { requireAdminPage } from "@/lib/admin-auth";
 import { OrderStatusManager } from "@/components/admin/OrderStatusManager";
 import type { OrderStatus } from "@/app/admin/orders/actions";
 import type { Database } from "@/types/database.types";
@@ -35,26 +35,7 @@ function formatLondonDateTime(isoString: string): string {
 
 export default async function AdminOrderDetailPage({ params }: OrderDetailPageProps) {
   const { id: orderId } = await params;
-  const supabase = await createServerSupabaseClient();
-
-  // 1. Verify admin role on server
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect(`/login?redirectTo=/admin/orders/${orderId}`);
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || profile.role !== "admin") {
-    redirect("/admin/forbidden");
-  }
+  const { supabase } = await requireAdminPage(`/admin/orders/${orderId}`);
 
   // 2. Fetch the order
   const { data: order, error: orderErr } = await supabase

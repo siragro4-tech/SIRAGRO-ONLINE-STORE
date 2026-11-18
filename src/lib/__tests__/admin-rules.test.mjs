@@ -7,6 +7,11 @@ import {
   validateProductImageFile,
   classifyStockStatus,
   shouldGroupCartActivity,
+  sanitizeAdminRedirect,
+  normalizeProductPrice,
+  isMissingSchemaError,
+  isStripeSecretConfigured,
+  isStripeWebhookConfigured,
   MAX_IMAGE_FILE_SIZE_BYTES,
 } from "../admin-rules.ts";
 import {
@@ -589,5 +594,34 @@ describe("Email Notification Status & Stripe Currency Checks", () => {
       }).valid,
       false
     );
+  });
+
+  it("restricts admin login redirects strictly to internal /admin paths", () => {
+    assert.equal(sanitizeAdminRedirect("/admin"), "/admin");
+    assert.equal(
+      sanitizeAdminRedirect("/admin/orders?view=completed"),
+      "/admin/orders?view=completed"
+    );
+    assert.equal(sanitizeAdminRedirect("/admin/login"), "/admin");
+    assert.equal(sanitizeAdminRedirect("//evil.example/admin"), "/admin");
+    assert.equal(sanitizeAdminRedirect("https://evil.example/admin"), "/admin");
+    assert.equal(sanitizeAdminRedirect("/account"), "/admin");
+    assert.equal(sanitizeAdminRedirect(null), "/admin");
+  });
+
+  it("validates quick GBP product price updates and gateway readiness flags", () => {
+    assert.equal(normalizeProductPrice("4.995"), 5);
+    assert.equal(normalizeProductPrice(2.5), 2.5);
+    assert.equal(normalizeProductPrice(0), 0);
+    assert.equal(normalizeProductPrice("-1"), null);
+    assert.equal(normalizeProductPrice("abc"), null);
+
+    assert.equal(isMissingSchemaError("column orders.refunded_amount does not exist"), true);
+    assert.equal(isMissingSchemaError("timeout connecting to host"), false);
+
+    assert.equal(isStripeSecretConfigured("sk_test_your-stripe-secret-key"), false);
+    assert.equal(isStripeSecretConfigured("sk_test_51ExampleKey"), true);
+    assert.equal(isStripeWebhookConfigured("whsec_your-stripe-webhook-secret"), false);
+    assert.equal(isStripeWebhookConfigured("whsec_ExampleSecret"), true);
   });
 });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Database } from "@/types/database.types";
 import {
+  quickUpdatePriceAction,
   quickUpdateStockAction,
   toggleProductStatusAction,
   deleteProductAction,
@@ -61,9 +62,11 @@ export function ProductListTable({
     text: string;
   } | null>(null);
 
-  // Optimistic inline stock editing
+  // Optimistic inline stock & price editing
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [stockInputVal, setStockInputVal] = useState<string>("");
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [priceInputVal, setPriceInputVal] = useState<string>("");
   const [isPending, startTransition] = useTransition();
 
   function buildUrl(overrides: {
@@ -120,6 +123,39 @@ export function ProductListTable({
         setFeedback({
           type: "error",
           text: res.error || "Failed to update stock.",
+        });
+      }
+    });
+  }
+
+  function startEditingPrice(p: ProductRow) {
+    setEditingPriceId(p.id);
+    setPriceInputVal(Number(p.price).toFixed(2));
+  }
+
+  function handleSavePrice(productId: string) {
+    const val = parseFloat(priceInputVal);
+    if (isNaN(val) || val < 0) {
+      setFeedback({
+        type: "error",
+        text: "Please enter a valid GBP price (0.00 or greater).",
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await quickUpdatePriceAction(productId, val);
+      setEditingPriceId(null);
+      if (res.success) {
+        setFeedback({
+          type: "success",
+          text: res.message || "Product price updated.",
+        });
+        router.refresh();
+      } else {
+        setFeedback({
+          type: "error",
+          text: res.error || "Failed to update price.",
         });
       }
     });
@@ -215,11 +251,10 @@ export function ProductListTable({
       {/* Action Feedback */}
       {feedback && (
         <div
-          className={`rounded-xl border p-4 text-sm font-semibold ${
-            feedback.type === "success"
-              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-              : "bg-red-50 text-red-800 border-red-200"
-          }`}
+          className={`rounded-xl border p-4 text-sm font-semibold ${feedback.type === "success"
+            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+            : "bg-red-50 text-red-800 border-red-200"
+            }`}
         >
           {feedback.text}
         </div>
@@ -303,11 +338,10 @@ export function ProductListTable({
             <Link
               key={tab.id}
               href={buildUrl({ filter: tab.id, page: 1 })}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                initialFilter === tab.id
-                  ? "bg-[#323C4B] text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${initialFilter === tab.id
+                ? "bg-[#323C4B] text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
             >
               {tab.label}
             </Link>
@@ -384,13 +418,68 @@ export function ProductListTable({
                       </td>
 
                       <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="font-bold text-slate-900">
-                          £{Number(prod.price).toFixed(2)}
-                        </span>
-                        {prod.compare_at_price && prod.compare_at_price > prod.price && (
-                          <span className="ml-1.5 text-xs text-slate-400 line-through">
-                            £{Number(prod.compare_at_price).toFixed(2)}
-                          </span>
+                        {editingPriceId === prod.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-500">£</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={priceInputVal}
+                              onChange={(e) => setPriceInputVal(e.target.value)}
+                              aria-label={`Price in GBP for ${prod.name}`}
+                              className="w-20 rounded border border-slate-300 px-1.5 py-0.5 text-xs font-semibold focus:border-[#323C4B] focus:ring-1 focus:ring-[#323C4B]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSavePrice(prod.id)}
+                              className="rounded bg-[#323C4B] px-2 py-0.5 text-xs font-bold text-white hover:bg-[#242c37]"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingPriceId(null)}
+                              className="rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-700 hover:bg-slate-300"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <span className="font-bold text-slate-900">
+                                £{Number(prod.price).toFixed(2)}
+                              </span>
+                              {prod.compare_at_price &&
+                                prod.compare_at_price > prod.price && (
+                                  <span className="ml-1.5 text-xs text-slate-400 line-through">
+                                    £{Number(prod.compare_at_price).toFixed(2)}
+                                  </span>
+                                )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => startEditingPrice(prod)}
+                              className="text-slate-400 hover:text-[#323C4B]"
+                              title="Quick edit price"
+                              aria-label={`Edit price for ${prod.name}`}
+                            >
+                              <svg
+                                className="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={2}
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         )}
                       </td>
 
@@ -422,13 +511,12 @@ export function ProductListTable({
                         ) : (
                           <div className="flex items-center gap-2">
                             <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                                isOut
-                                  ? "bg-red-100 text-red-800"
-                                  : isLow
+                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${isOut
+                                ? "bg-red-100 text-red-800"
+                                : isLow
                                   ? "bg-amber-100 text-amber-800"
                                   : "bg-emerald-100 text-emerald-800"
-                              }`}
+                                }`}
                             >
                               {prod.stock_quantity} in stock
                             </span>
@@ -452,11 +540,10 @@ export function ProductListTable({
                           type="button"
                           onClick={() => handleToggleStatus(prod)}
                           disabled={isPending}
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold transition-colors ${
-                            prod.is_available
-                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                              : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                          }`}
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold transition-colors ${prod.is_available
+                            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                            : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                            }`}
                           title="Click to toggle store visibility"
                         >
                           {prod.is_available ? "Active" : "Archived"}

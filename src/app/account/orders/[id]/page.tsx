@@ -69,7 +69,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Breadcrumb Navigation */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-gray-500 mb-6">
+      <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-6">
         <Link href="/" className="hover:text-[#323C4B] transition-colors">
           Home
         </Link>
@@ -84,10 +84,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
       </nav>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-4 gap-2">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-4 gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
               Order #{order.order_number}
             </h1>
             <span
@@ -109,7 +109,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
           </p>
         </div>
 
-        <div className="text-right">
+        <div className="text-left sm:text-right shrink-0">
           <p className="text-xs text-gray-500">Payment Status</p>
           <span className="font-semibold text-xs text-green-700 uppercase tracking-wider">
             ✓ {order.payment_status}

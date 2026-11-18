@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Logo } from "@/components/layout/Logo";
 import {
   calculateRevenueSummary,
@@ -209,6 +209,19 @@ export function AdminDashboardPreview() {
   const [selectedPeriod, setSelectedPeriod] = useState<SalesPeriod>("month");
   const [activityFilter, setActivityFilter] = useState<string>("all");
 
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setSidebarOpen(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [sidebarOpen]);
+
   const revenueSummary = calculateRevenueSummary(
     DEMO_ORDERS,
     selectedPeriod,
@@ -263,14 +276,14 @@ export function AdminDashboardPreview() {
 
       <div className="flex min-h-[calc(100vh-48px)] flex-col bg-slate-50 lg:flex-row">
         {/* Mobile Preview Top Bar */}
-        <div className="flex h-16 items-center justify-between border-b border-[#242c37] bg-[#323C4B] px-4 text-white lg:hidden">
-          <div className="flex items-center gap-2.5">
+        <div className="sticky top-[46px] z-30 flex h-16 items-center justify-between border-b border-[#242c37] bg-[#323C4B] px-4 text-white lg:hidden">
+          <div className="flex items-center gap-2.5 min-w-0">
             <Logo size={34} dark />
-            <div>
-              <span className="block text-sm font-black tracking-wide leading-tight">
+            <div className="min-w-0">
+              <span className="block truncate text-sm font-black tracking-wide leading-tight">
                 SIRAGRO
               </span>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+              <span className="block truncate text-[10px] font-semibold uppercase tracking-wider text-slate-300">
                 Admin Portal (Preview)
               </span>
             </div>
@@ -281,6 +294,7 @@ export function AdminDashboardPreview() {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="rounded-lg p-2 text-slate-200 hover:bg-[#242c37]"
             aria-label="Toggle preview navigation menu"
+            aria-controls="preview-sidebar-drawer"
             aria-expanded={sidebarOpen}
           >
             <svg
@@ -299,54 +313,77 @@ export function AdminDashboardPreview() {
           </button>
         </div>
 
-        {/* Presentation-Only Sidebar (matches AdminSidebar branding cleanly) */}
+        {/* Mobile Backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/55 backdrop-blur-xs lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Presentation-Only Responsive Sidebar */}
         <aside
-          className={`${
-            sidebarOpen ? "flex" : "hidden lg:flex"
-          } w-full lg:w-64 shrink-0 flex-col justify-between border-r border-slate-200 bg-white`}
+          id="preview-sidebar-drawer"
+          className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 max-w-[85vw] shrink-0 flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-200 ease-out lg:sticky lg:top-[46px] lg:z-auto lg:h-[calc(100dvh-46px)] lg:w-64 lg:max-w-none lg:translate-x-0 lg:shadow-none ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
         >
-          <div>
-            <div className="flex items-center gap-3 bg-[#323C4B] px-5 py-5 text-white">
-              <Logo size={40} dark />
+          <div className="shrink-0 flex items-center justify-between gap-3 bg-[#323C4B] px-5 py-4 text-white">
+            <div className="flex items-center gap-3 min-w-0">
+              <Logo size={38} dark />
               <div className="min-w-0">
-                <div className="font-black tracking-wide text-white leading-tight">
+                <div className="font-black tracking-wide text-white leading-tight truncate">
                   SIRAGRO
                 </div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-300 truncate">
                   Store Admin (Demo)
                 </div>
               </div>
             </div>
-
-            <nav className="p-4 space-y-1" aria-label="Admin Preview Navigation">
-              {PREVIEW_NAV_ITEMS.map((item) => (
-                <div
-                  key={item.name}
-                  aria-disabled="true"
-                  title="Preview navigation item — disabled in demo mode"
-                  className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-semibold ${
-                    item.active
-                      ? "bg-[#323C4B] text-white shadow-xs"
-                      : "text-slate-500 bg-slate-50/70 opacity-80 cursor-not-allowed"
-                  }`}
-                >
-                  <span>{item.name}</span>
-                  {item.badgeCount ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                      {item.badgeCount}
-                    </span>
-                  ) : !item.active ? (
-                    <span className="text-[10px] font-medium text-slate-400">
-                      Preview
-                    </span>
-                  ) : null}
-                </div>
-              ))}
-            </nav>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="rounded-lg p-1.5 text-slate-200 hover:bg-[#242c37] lg:hidden"
+              aria-label="Close preview sidebar"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          <div className="border-t border-slate-200 p-4 space-y-3 bg-slate-50/70">
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <nav
+            className="flex-1 overflow-y-auto px-3.5 py-3 space-y-1"
+            aria-label="Admin Preview Navigation"
+          >
+            {PREVIEW_NAV_ITEMS.map((item) => (
+              <div
+                key={item.name}
+                aria-disabled="true"
+                title="Preview navigation item — disabled in demo mode"
+                className={`flex items-center justify-between rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                  item.active
+                    ? "bg-[#323C4B] text-white shadow-xs"
+                    : "text-slate-500 bg-slate-50/70 opacity-80 cursor-not-allowed"
+                }`}
+              >
+                <span className="truncate">{item.name}</span>
+                {item.badgeCount ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 shrink-0">
+                    {item.badgeCount}
+                  </span>
+                ) : !item.active ? (
+                  <span className="text-[10px] font-medium text-slate-400 shrink-0">
+                    Preview
+                  </span>
+                ) : null}
+              </div>
+            ))}
+          </nav>
+
+          <div className="shrink-0 border-t border-slate-200 p-3.5 space-y-2.5 bg-slate-50/70">
+            <div className="rounded-xl border border-slate-200 bg-white p-2.5">
               <p className="truncate text-xs font-bold text-slate-900">
                 Demo Store Owner
               </p>
@@ -366,7 +403,7 @@ export function AdminDashboardPreview() {
         </aside>
 
         {/* Main Content Area (mirrors src/app/admin/page.tsx layout) */}
-        <div className="flex flex-1 flex-col min-w-0">
+        <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
           <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-8">
             {/* Page Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">

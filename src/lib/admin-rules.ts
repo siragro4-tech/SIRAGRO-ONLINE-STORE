@@ -221,3 +221,91 @@ export function shouldGroupCartActivity(
   const diffMs = nowMs - existingMs;
   return diffMs >= 0 && diffMs <= windowMinutes * 60 * 1000;
 }
+
+/**
+ * Restricts post-login admin redirects strictly to internal /admin paths.
+ * Prevents open redirects and protocol-relative redirect bypasses.
+ */
+export function sanitizeAdminRedirect(raw?: string | null): string {
+  if (!raw) return "/admin";
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("/admin") || trimmed.startsWith("//")) {
+    return "/admin";
+  }
+  if (trimmed === "/admin/login" || trimmed.startsWith("/admin/login?")) {
+    return "/admin";
+  }
+  return trimmed;
+}
+
+/**
+ * Normalizes and validates a non-negative GBP product price rounded to 2 decimals.
+ */
+export function normalizeProductPrice(raw: unknown): number | null {
+  const num =
+    typeof raw === "number"
+      ? raw
+      : typeof raw === "string"
+        ? Number(raw.trim())
+        : NaN;
+  if (!Number.isFinite(num) || num < 0) return null;
+  return roundMoney(num);
+}
+
+/**
+ * Detects Postgres / PostgREST errors indicating an optional migration column or table is pending.
+ */
+export function isMissingSchemaError(message?: string | null): boolean {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("does not exist") ||
+    lower.includes("schema cache") ||
+    lower.includes("could not find")
+  );
+}
+
+export function formatLondonShortDateTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+export function formatLondonDateTimeWithYear(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/London",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+export function isStripeSecretConfigured(secretKey?: string | null): boolean {
+  if (!secretKey) return false;
+  const trimmed = secretKey.trim();
+  if (!trimmed || trimmed.includes("your-stripe-secret-key")) return false;
+  return trimmed.startsWith("sk_");
+}
+
+export function isStripeWebhookConfigured(secret?: string | null): boolean {
+  if (!secret) return false;
+  const trimmed = secret.trim();
+  if (!trimmed || trimmed.includes("your-stripe-webhook-secret")) return false;
+  return trimmed.startsWith("whsec_");
+}
