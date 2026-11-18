@@ -124,18 +124,7 @@ export default async function AdminActivityPage() {
         </Link>
       </div>
 
-      {migrationPending && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900">
-          <p className="font-bold text-sm">Migration 004 Not Applied Yet</p>
-          <p className="mt-1">
-            Run{" "}
-            <code className="font-mono font-semibold">
-              supabase/migrations/004_admin_activity_and_inventory.sql
-            </code>{" "}
-            in Supabase SQL Editor to activate notifications, aggregate basket metrics, and inventory adjustment history.
-          </p>
-        </div>
-      )}
+
 
       {/* 1. Notifications Feed */}
       <section className="space-y-3">

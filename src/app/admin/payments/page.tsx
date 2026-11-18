@@ -317,9 +317,7 @@ export default async function AdminPaymentsPage({
               : "Error"}
           </div>
           <p className="mt-1.5 text-xs text-slate-500">
-            {refundSchemaSupported
-              ? "Deducted from net revenue"
-              : "Apply migration 004 for partial refunds"}
+            Deducted from net revenue
           </p>
         </div>
 

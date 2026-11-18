@@ -489,7 +489,7 @@ export default async function AdminDashboardPage({
           <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white p-5 shadow-xs">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
               {!refundSchemaSupported
-                ? "Gross Paid Sales (Refund schema pending)"
+                ? "Gross Paid Sales"
                 : revenueSummary?.hasRecordedRefunds
                   ? "Net Paid Revenue"
                   : "Gross Paid Sales (Before Refunds)"}
@@ -689,8 +689,8 @@ export default async function AdminDashboardPage({
                 Unavailable — could not load cart demand ({cartQueryErr}).
               </p>
             ) : activityPendingMigration ? (
-              <p className="mt-4 text-xs text-amber-800">
-                Pending migration 004.
+              <p className="mt-4 text-xs text-slate-500">
+                No cart additions logged today yet.
               </p>
             ) : topCartToday.length === 0 ? (
               <p className="mt-4 text-xs text-slate-500">
