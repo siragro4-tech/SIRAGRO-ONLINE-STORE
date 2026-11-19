@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isAdminRole } from "@/lib/admin-rules";
+import {
+  ADMIN_SESSION_COOKIE_NAME,
+  verifyAdminSessionToken,
+} from "@/lib/admin-session";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminSessionGuard } from "@/components/admin/AdminSessionGuard";
 
 export const metadata: Metadata = {
   title: {
@@ -19,13 +25,18 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
+  const sessionCheck = await verifyAdminSessionToken(sessionToken);
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Allow /admin/login cleanly when unauthenticated; every protected page enforces requireAdminPage().
-  if (!user) {
+  // Allow /admin/login cleanly when unauthenticated or session locked;
+  // every protected page enforces requireAdminPage().
+  if (!user || !sessionCheck.valid) {
     return <>{children}</>;
   }
 
@@ -36,8 +47,7 @@ export default async function AdminLayout({
     .eq("id", user.id)
     .single();
 
-  // If user is not an admin, allow /admin/forbidden to render cleanly without admin chrome;
-  // every protected page also calls requireAdminPage() on the server.
+  // If user is not an admin, allow /admin/forbidden to render cleanly without admin chrome
   if (!profile || !isAdminRole(profile.role)) {
     return <>{children}</>;
   }
@@ -60,6 +70,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-dvh flex-col bg-slate-50 lg:flex-row">
+      <AdminSessionGuard />
       <AdminSidebar
         userEmail={profile.email}
         adminName={adminName}

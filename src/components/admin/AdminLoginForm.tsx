@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { adminLoginAction } from "@/app/admin/actions";
@@ -9,16 +9,76 @@ import { sanitizeAdminRedirect } from "@/lib/admin-rules";
 
 /**
  * Administrator sign-in form for /admin/login.
- * Submits strictly to adminLoginAction which checks profiles.role === 'admin'.
+ * Strictly prevents credential pre-filling, autofill persistence,
+ * and clears inputs immediately on mount, logout, or session termination.
  */
 export function AdminLoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = sanitizeAdminRedirect(searchParams.get("redirectTo"));
+  const loggedOut = searchParams.get("logged_out");
+  const reason = searchParams.get("reason");
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [state, formAction, isPending] = useActionState(adminLoginAction, null);
 
+  // Clear inputs and reset form whenever mounted or restored from browser cache (bfcache)
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+    if (formRef.current) {
+      formRef.current.reset();
+    }
+
+    const handlePageShow = () => {
+      setEmail("");
+      setPassword("");
+      if (formRef.current) {
+        formRef.current.reset();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
+
+  const handleSubmit = (formData: FormData) => {
+    formAction(formData);
+    // Erase password from React state immediately upon submit
+    setPassword("");
+  };
+
   return (
-    <form action={formAction} className="space-y-5">
+    <form
+      ref={formRef}
+      action={handleSubmit}
+      autoComplete="off"
+      noValidate
+      className="space-y-5"
+    >
       <input type="hidden" name="redirectTo" value={redirectTo} />
+
+      {loggedOut && !state?.error && (
+        <div
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 text-center"
+        >
+          You have been securely signed out.
+        </div>
+      )}
+
+      {reason === "timeout" && !state?.error && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800 text-center"
+        >
+          Admin session was locked after leaving the page. Please sign in again.
+        </div>
+      )}
 
       {state?.error && (
         <div
@@ -41,9 +101,14 @@ export function AdminLoginForm() {
             id="admin-email"
             name="email"
             type="email"
-            autoComplete="email"
+            autoComplete="off"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-form-type="other"
             required
-            placeholder="owner@siragro.co.uk"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@gmail.com"
             className="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
           />
         </div>
@@ -60,8 +125,13 @@ export function AdminLoginForm() {
           <PasswordInput
             id="admin-password"
             name="password"
-            autoComplete="current-password"
+            autoComplete="new-password"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-form-type="other"
             required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className="block w-full rounded-xl border border-slate-300 py-2.5 pl-3.5 pr-10 text-sm text-slate-900 shadow-2xs placeholder:text-slate-400 focus:border-[#323C4B] focus:outline-none focus:ring-1 focus:ring-[#323C4B]"
           />
         </div>

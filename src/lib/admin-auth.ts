@@ -1,12 +1,26 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isAdminRole } from "@/lib/admin-rules";
+import {
+  ADMIN_SESSION_COOKIE_NAME,
+  verifyAdminSessionToken,
+} from "@/lib/admin-session";
 
 /**
- * Enforces admin authentication & role verification on Server Component pages.
- * Redirects unauthenticated visitors to /admin/login and non-admin users to /admin/forbidden.
+ * Enforces admin authentication & active session verification on Server Component pages.
+ * Redirects unauthenticated visitors or expired/left sessions to /admin/login.
+ * Redirects non-admin users to /admin/forbidden.
  */
 export async function requireAdminPage(redirectPath: string = "/admin") {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
+  const sessionResult = await verifyAdminSessionToken(sessionToken);
+
+  if (!sessionResult.valid) {
+    redirect(`/admin/login?redirectTo=${encodeURIComponent(redirectPath)}`);
+  }
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -30,10 +44,21 @@ export async function requireAdminPage(redirectPath: string = "/admin") {
 }
 
 /**
- * Enforces admin authentication & role verification inside Server Actions.
- * Never trusts client-provided user IDs or roles.
+ * Enforces admin authentication & active session verification inside Server Actions.
+ * Never trusts client-provided user IDs, roles, or stale sessions.
  */
 export async function requireAdminAction() {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
+  const sessionResult = await verifyAdminSessionToken(sessionToken);
+
+  if (!sessionResult.valid) {
+    return {
+      authorized: false as const,
+      error: "Admin session locked or expired. Please sign in again.",
+    };
+  }
+
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

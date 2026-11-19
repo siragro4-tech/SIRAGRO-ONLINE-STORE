@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isAdminRole } from "@/lib/admin-rules";
 import { Logo } from "@/components/layout/Logo";
 import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: "Admin Portal Sign In",
@@ -15,25 +15,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function AdminLoginPage() {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile && isAdminRole(profile.role)) {
-      redirect("/admin");
-    }
-    redirect("/admin/forbidden");
-  }
-
+export default function AdminLoginPage() {
   return (
     <div className="flex min-h-dvh flex-col justify-center bg-slate-50 px-4 py-10 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md space-y-4">

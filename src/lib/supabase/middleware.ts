@@ -1,9 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database.types";
+import {
+  ADMIN_SESSION_COOKIE_NAME,
+  verifyAdminSessionToken,
+  getClearAdminSessionCookieOptions,
+} from "@/lib/admin-session";
 
 /**
- * Updates session cookies and enforces route-level authentication/authorization.
+ * Updates session cookies and enforces strict route-level authentication/authorization.
+ * When the admin page is left, the ephemeral admin session is invalidated so returning
+ * always requires re-authenticating with administrator credentials.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -44,8 +51,7 @@ export async function updateSession(request: NextRequest) {
   });
 
   // IMPORTANT: Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  // supabase.auth.getUser().
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -77,20 +83,53 @@ export async function updateSession(request: NextRequest) {
       url.pathname = "/admin/forbidden";
       return NextResponse.redirect(url);
     }
+
+    // Verify active ephemeral admin session
+    const adminSessionToken = request.cookies.get(
+      ADMIN_SESSION_COOKIE_NAME
+    )?.value;
+    const sessionCheck = await verifyAdminSessionToken(adminSessionToken);
+
+    if (!sessionCheck.valid) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/admin/login";
+      url.searchParams.set("redirectTo", pathname);
+      const res = NextResponse.redirect(url);
+      res.cookies.set(
+        ADMIN_SESSION_COOKIE_NAME,
+        "",
+        getClearAdminSessionCookieOptions()
+      );
+      return res;
+    }
   }
 
-  // 1b. If already signed in on /admin/login, send verified admins to /admin and shoppers to /admin/forbidden
-  if (pathname === "/admin/login" && user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+  // 1b. On /admin/login: NEVER auto-redirect to /admin.
+  // Visiting /admin/login always requires entering credentials. Clear any stale admin token.
+  if (pathname === "/admin/login") {
+    if (request.cookies.has(ADMIN_SESSION_COOKIE_NAME)) {
+      supabaseResponse.cookies.set(
+        ADMIN_SESSION_COOKIE_NAME,
+        "",
+        getClearAdminSessionCookieOptions()
+      );
+    }
+  }
 
-    const url = request.nextUrl.clone();
-    url.pathname = profile?.role === "admin" ? "/admin" : "/admin/forbidden";
-    url.search = "";
-    return NextResponse.redirect(url);
+  // 1c. When the admin leaves the admin dashboard to view the public site or account,
+  // revoke the ephemeral admin session immediately so returning requires entering credentials again.
+  if (
+    !pathname.startsWith("/admin") &&
+    !pathname.startsWith("/_next") &&
+    !pathname.startsWith("/api") &&
+    request.cookies.has(ADMIN_SESSION_COOKIE_NAME)
+  ) {
+    supabaseResponse.cookies.set(
+      ADMIN_SESSION_COOKIE_NAME,
+      "",
+      getClearAdminSessionCookieOptions()
+    );
+    await supabase.auth.signOut();
   }
 
   // 2. Guard /account routes (must be logged in)
@@ -110,4 +149,3 @@ export async function updateSession(request: NextRequest) {
 
   return supabaseResponse;
 }
-

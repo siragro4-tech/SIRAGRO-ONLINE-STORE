@@ -38,6 +38,13 @@ import {
   resolveNotificationRecord,
 } from "../email-status.ts";
 import { validatePaidGbpStripeSession } from "../stripe-rules.ts";
+import {
+  createAdminSessionToken,
+  verifyAdminSessionToken,
+  ADMIN_SESSION_COOKIE_NAME,
+  getAdminSessionCookieOptions,
+  getClearAdminSessionCookieOptions,
+} from "../admin-session.ts";
 
 describe("Admin Authorization Rules", () => {
   it("grants admin access strictly to role === 'admin'", () => {
@@ -48,6 +55,45 @@ describe("Admin Authorization Rules", () => {
     assert.equal(isAdminRole(null), false);
     assert.equal(isAdminRole(undefined), false);
     assert.equal(isAdminRole(""), false);
+  });
+
+  it("creates and verifies ephemeral admin session tokens", async () => {
+    const token = await createAdminSessionToken("user-123", "admin@siragro.co.uk");
+    assert.ok(token);
+    assert.ok(token.includes("."));
+
+    const verified = await verifyAdminSessionToken(token);
+    assert.equal(verified.valid, true);
+    assert.equal(verified.payload?.userId, "user-123");
+    assert.equal(verified.payload?.email, "admin@siragro.co.uk");
+    assert.equal(verified.payload?.role, "admin");
+
+    // Rejects tampered token
+    const tampered = token + "xyz";
+    const invalidTampered = await verifyAdminSessionToken(tampered);
+    assert.equal(invalidTampered.valid, false);
+
+    // Rejects empty or malformed tokens
+    assert.equal((await verifyAdminSessionToken("")).valid, false);
+    assert.equal((await verifyAdminSessionToken(null)).valid, false);
+    assert.equal((await verifyAdminSessionToken("invalid-format")).valid, false);
+
+    // Rejects expired token
+    const expiredResult = await verifyAdminSessionToken(token, -1000);
+    assert.equal(expiredResult.valid, false);
+  });
+
+  it("enforces session-only cookie policies (no maxAge/expires on active session)", () => {
+    const sessionOpts = getAdminSessionCookieOptions();
+    assert.equal(sessionOpts.httpOnly, true);
+    assert.equal(sessionOpts.sameSite, "lax");
+    assert.equal(sessionOpts.path, "/");
+    assert.equal("maxAge" in sessionOpts, false);
+    assert.equal("expires" in sessionOpts, false);
+
+    const clearOpts = getClearAdminSessionCookieOptions();
+    assert.equal(clearOpts.maxAge, 0);
+    assert.equal(clearOpts.expires.getTime(), 0);
   });
 });
 

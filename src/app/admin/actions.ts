@@ -2,9 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { requireAdminAction } from "@/lib/admin-auth";
 import { isAdminRole, sanitizeAdminRedirect } from "@/lib/admin-rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  ADMIN_SESSION_COOKIE_NAME,
+  createAdminSessionToken,
+  getAdminSessionCookieOptions,
+  getClearAdminSessionCookieOptions,
+} from "@/lib/admin-session";
 
 export type AdminLoginResult = {
   error?: string;
@@ -49,6 +56,12 @@ export async function adminLoginAction(
     .single();
 
   if (profileErr || !profile || !isAdminRole(profile.role)) {
+    const cookieStore = await cookies();
+    cookieStore.set(
+      ADMIN_SESSION_COOKIE_NAME,
+      "",
+      getClearAdminSessionCookieOptions()
+    );
     await supabase.auth.signOut();
     return {
       error:
@@ -56,18 +69,33 @@ export async function adminLoginAction(
     };
   }
 
+  // Issue ephemeral active admin session token
+  const cookieStore = await cookies();
+  const sessionToken = await createAdminSessionToken(data.user.id, email);
+  cookieStore.set(
+    ADMIN_SESSION_COOKIE_NAME,
+    sessionToken,
+    getAdminSessionCookieOptions()
+  );
+
   revalidatePath("/", "layout");
   redirect(redirectTo);
 }
 
 /**
- * Signs out the current session and returns to the /admin/login portal.
+ * Signs out the current session, deletes the admin session token, and returns to /admin/login.
  */
 export async function adminLogoutAction() {
+  const cookieStore = await cookies();
+  cookieStore.set(
+    ADMIN_SESSION_COOKIE_NAME,
+    "",
+    getClearAdminSessionCookieOptions()
+  );
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/admin/login");
+  redirect("/admin/login?logged_out=1");
 }
 
 export async function markActivityReadAction(
