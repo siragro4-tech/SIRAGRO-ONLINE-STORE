@@ -196,7 +196,7 @@ export function ProductCard({ product }: ProductCardProps) {
     >
       <div>
         {/* Product Image Area — uploaded product photo or brand-coloured category mockup */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-slate-50 group-hover:scale-[1.02] transition-transform duration-300">
+        <div className="pointer-events-none relative z-20 aspect-square w-full overflow-hidden rounded-lg bg-slate-50 group-hover:scale-[1.02] transition-transform duration-300">
           {uploadedImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
