@@ -47,6 +47,22 @@ Never point a development build at the live production database until staging ha
 
 ---
 
+## Debug Design Preview Mode (Offline UI Preview)
+
+If you want to preview the redesigned screens, typography, motion, and sample grocery cards **without** connecting to Supabase or a backend server, launch the app in **debug mode** with `SIRAGRO_DESIGN_PREVIEW=true`:
+
+```bash
+cd apps/mobile
+flutter pub get
+flutter run --dart-define=SIRAGRO_DESIGN_PREVIEW=true
+```
+
+- **Debug-only:** This mode only works when `kDebugMode` is true and never activates in release/production builds.
+- **Clearly labelled:** A top banner (`DESIGN PREVIEW • SAMPLE DATA`) appears across the app so sample data cannot be mistaken for live store inventory or prices.
+- **No live backend calls:** Categories, sample products, and an in-memory basket are loaded locally from `lib/core/preview/design_preview_fixtures.dart`, while Home Delivery remains unconfirmed/disabled.
+
+---
+
 ## Formatting, Analysis & Tests
 
 ```bash

@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/siragro_theme.dart';
+import '../../core/preview/design_preview_fixtures.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/widgets/state_views.dart';
 import '../../shared/models/product.dart';
@@ -9,6 +11,14 @@ import '../basket/basket_controller.dart';
 
 final productDetailProvider =
     FutureProvider.autoDispose.family<Product, String>((ref, slug) async {
+  final config = ref.watch(appConfigProvider);
+  if (config.isDesignPreview) {
+    return DesignPreviewFixtures.products.firstWhere(
+      (p) => p.slug == slug,
+      orElse: () => DesignPreviewFixtures.products.first,
+    );
+  }
+
   final api = ref.read(apiClientProvider);
   final data = await api.get('/api/v1/products/$slug');
   return Product.fromJson((data['product'] as Map<String, dynamic>?) ?? const {});
@@ -54,94 +64,96 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Image gallery
-              AspectRatio(
-                aspectRatio: 1,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: SiragroColors.border),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: gallery.isEmpty
-                      ? const Center(
-                          child: Icon(
-                            Icons.shopping_basket_outlined,
-                            size: 64,
-                            color: SiragroColors.textMuted,
-                          ),
-                        )
-                      : Stack(
-                          children: [
-                            PageView.builder(
-                              itemCount: gallery.length,
-                              onPageChanged: (i) =>
-                                  setState(() => _imageIndex = i),
-                              itemBuilder: (_, idx) => CachedNetworkImage(
-                                imageUrl: gallery[idx],
-                                fit: BoxFit.contain,
-                                placeholder: (_, __) => const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                                errorWidget: (_, __, ___) => const Center(
-                                  child: Icon(
-                                    Icons.image_not_supported_outlined,
-                                    size: 48,
-                                    color: SiragroColors.textMuted,
-                                  ),
-                                ),
-                              ),
+              Hero(
+                tag: 'product-image-${product.id}',
+                child: AspectRatio(
+                  aspectRatio: 1.08,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: SiragroColors.surfaceWarm,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: SiragroColors.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: gallery.isEmpty
+                        ? Center(
+                            child: Icon(
+                              product.isAgeRestricted
+                                  ? Icons.wine_bar_outlined
+                                  : Icons.shopping_basket_outlined,
+                              size: 64,
+                              color: SiragroColors.brandLight.withValues(alpha: 0.55),
                             ),
-                            if (gallery.length > 1)
-                              Positioned(
-                                bottom: 10,
-                                left: 0,
-                                right: 0,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: List.generate(
-                                    gallery.length,
-                                    (idx) => Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 3,
-                                      ),
-                                      width: _imageIndex == idx ? 18 : 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: _imageIndex == idx
-                                            ? SiragroColors.brand
-                                            : SiragroColors.border,
-                                        borderRadius: BorderRadius.circular(999),
-                                      ),
+                          )
+                        : Stack(
+                            children: [
+                              PageView.builder(
+                                itemCount: gallery.length,
+                                onPageChanged: (i) =>
+                                    setState(() => _imageIndex = i),
+                                itemBuilder: (_, idx) => CachedNetworkImage(
+                                  imageUrl: gallery[idx],
+                                  fit: BoxFit.contain,
+                                  placeholder: (_, __) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (_, __, ___) => const Center(
+                                    child: Icon(
+                                      Icons.image_not_supported_outlined,
+                                      size: 48,
+                                      color: SiragroColors.textMuted,
                                     ),
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                              if (gallery.length > 1)
+                                Positioned(
+                                  bottom: 12,
+                                  left: 0,
+                                  right: 0,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: List.generate(
+                                      gallery.length,
+                                      (idx) => AnimatedContainer(
+                                        duration: const Duration(milliseconds: 220),
+                                        margin: const EdgeInsets.symmetric(
+                                          horizontal: 3,
+                                        ),
+                                        width: _imageIndex == idx ? 20 : 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: _imageIndex == idx
+                                              ? SiragroColors.brand
+                                              : SiragroColors.borderStrong,
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
               if (product.category != null)
                 Text(
                   product.category!.name.toUpperCase(),
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                    color: SiragroColors.brand,
+                    letterSpacing: 0.7,
+                    color: SiragroColors.sage,
                   ),
                 ),
               const SizedBox(height: 4),
               Text(
                 product.name,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: SiragroColors.textPrimary,
-                ),
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
               if (product.brand != null || product.unit != null) ...[
                 const SizedBox(height: 4),
@@ -155,17 +167,17 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
 
-              // Price & Availability
               Row(
                 children: [
                   Text(
                     '£${product.price.toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 26,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
                       color: SiragroColors.brand,
+                      fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
                   if (product.hasDiscount) ...[
@@ -176,6 +188,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         fontSize: 16,
                         color: SiragroColors.textMuted,
                         decoration: TextDecoration.lineThrough,
+                        fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
@@ -190,26 +203,26 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     ),
                     backgroundColor: product.isOutOfStock
                         ? SiragroColors.accentRed.withValues(alpha: 0.1)
-                        : SiragroColors.accentGreen.withValues(alpha: 0.1),
+                        : SiragroColors.sageTint,
                     labelStyle: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: product.isOutOfStock
                           ? SiragroColors.accentRed
-                          : SiragroColors.accentGreen,
+                          : SiragroColors.sage,
                     ),
                   ),
                 ],
               ),
 
               if (product.isAgeRestricted) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: SiragroColors.accentRed.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
+                    color: SiragroColors.accentRed.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: SiragroColors.accentRed.withValues(alpha: 0.35),
+                      color: SiragroColors.accentRed.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -237,36 +250,27 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
               if (product.description != null &&
                   product.description!.trim().isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
+                const SizedBox(height: 18),
+                Text(
                   'Product Information',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: SiragroColors.textPrimary,
-                  ),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 6),
                 Text(
                   product.description!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: SiragroColors.textPrimary,
-                    height: 1.5,
-                  ),
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ],
 
               const SizedBox(height: 24),
 
-              // Quantity + Add to Basket
               if (!product.isOutOfStock)
                 Row(
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        color: SiragroColors.surface,
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: SiragroColors.border),
                       ),
                       child: Row(
@@ -274,9 +278,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           IconButton(
                             tooltip: 'Decrease quantity',
                             onPressed: _quantity > 1
-                                ? () => setState(() => _quantity -= 1)
+                                ? () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _quantity -= 1);
+                                  }
                                 : null,
-                            icon: const Icon(Icons.remove),
+                            icon: const Icon(Icons.remove_rounded),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -285,15 +292,19 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
+                                fontFeatures: [FontFeature.tabularFigures()],
                               ),
                             ),
                           ),
                           IconButton(
                             tooltip: 'Increase quantity',
                             onPressed: _quantity < maxSelectable
-                                ? () => setState(() => _quantity += 1)
+                                ? () {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _quantity += 1);
+                                  }
                                 : null,
-                            icon: const Icon(Icons.add),
+                            icon: const Icon(Icons.add_rounded),
                           ),
                         ],
                       ),
@@ -304,6 +315,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         onPressed: _isAdding
                             ? null
                             : () async {
+                                HapticFeedback.lightImpact();
                                 setState(() => _isAdding = true);
                                 final err = await ref
                                     .read(basketControllerProvider.notifier)
@@ -312,6 +324,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                 setState(() => _isAdding = false);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
+                                    behavior: SnackBarBehavior.floating,
                                     content: Text(
                                       err ??
                                           'Added $_quantity × ${product.name} to basket',

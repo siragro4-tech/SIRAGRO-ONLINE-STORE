@@ -27,89 +27,140 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Customer Sign In')),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(SiragroSpacing.lg),
           children: [
-            const Text(
-              'Welcome back to SIRAGRO',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Sign in to view your orders, saved addresses, and merge your basket.',
-              style: TextStyle(color: SiragroColors.textMuted),
-            ),
-            const SizedBox(height: 20),
-            if (auth.errorMessage != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: SiragroColors.accentRed.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  auth.errorMessage!,
-                  style: const TextStyle(color: SiragroColors.accentRed),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(SiragroSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: SiragroColors.brand,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'WELCOME BACK',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: SiragroColors.brassSoft,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Sign in to SIRAGRO',
+                            style: textTheme.headlineMedium?.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'View your order history, saved details, and sync your basket across devices.',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.86),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: SiragroSpacing.lg),
+                    if (auth.errorMessage != null) ...[
+                      _AuthErrorBanner(message: auth.errorMessage!),
+                      const SizedBox(height: SiragroSpacing.md),
+                    ],
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(SiragroSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextFormField(
+                              controller: _emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Email address',
+                                prefixIcon: Icon(Icons.mail_outline_rounded),
+                              ),
+                              validator: (v) => (v == null || !v.contains('@'))
+                                  ? 'Enter a valid email'
+                                  : null,
+                            ),
+                            const SizedBox(height: SiragroSpacing.md),
+                            TextFormField(
+                              controller: _passwordCtrl,
+                              obscureText: _obscure,
+                              textInputAction: TextInputAction.done,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                suffixIcon: IconButton(
+                                  tooltip: _obscure ? 'Show password' : 'Hide password',
+                                  onPressed: () =>
+                                      setState(() => _obscure = !_obscure),
+                                  icon: Icon(
+                                    _obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                              validator: (v) => (v == null || v.isEmpty)
+                                  ? 'Enter your password'
+                                  : null,
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () =>
+                                    context.push('/auth/forgot-password'),
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
+                            const SizedBox(height: SiragroSpacing.xs),
+                            ElevatedButton(
+                              onPressed: auth.isLoading
+                                  ? null
+                                  : () async {
+                                      if (!_formKey.currentState!.validate()) {
+                                        return;
+                                      }
+                                      final ok = await ref
+                                          .read(authControllerProvider.notifier)
+                                          .signIn(
+                                            email: _emailCtrl.text,
+                                            password: _passwordCtrl.text,
+                                          );
+                                      if (ok && context.mounted) {
+                                        context.go('/account');
+                                      }
+                                    },
+                              child: Text(auth.isLoading ? 'Signing in…' : 'Sign In'),
+                            ),
+                            const SizedBox(height: SiragroSpacing.sm),
+                            OutlinedButton(
+                              onPressed: () => context.push('/auth/register'),
+                              child: const Text('Create a Customer Account'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
-            ],
-            TextFormField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email address'),
-              validator: (v) =>
-                  (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _passwordCtrl,
-              obscureText: _obscure,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                suffixIcon: IconButton(
-                  tooltip: _obscure ? 'Show password' : 'Hide password',
-                  onPressed: () => setState(() => _obscure = !_obscure),
-                  icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
-                ),
-              ),
-              validator: (v) =>
-                  (v == null || v.isEmpty) ? 'Enter your password' : null,
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => context.push('/auth/forgot-password'),
-                child: const Text('Forgot password?'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: auth.isLoading
-                  ? null
-                  : () async {
-                      if (!_formKey.currentState!.validate()) return;
-                      final ok = await ref
-                          .read(authControllerProvider.notifier)
-                          .signIn(
-                            email: _emailCtrl.text,
-                            password: _passwordCtrl.text,
-                          );
-                      if (ok && context.mounted) {
-                        context.go('/account');
-                      }
-                    },
-              child: Text(auth.isLoading ? 'Signing in…' : 'Sign In'),
-            ),
-            const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: () => context.push('/auth/register'),
-              child: const Text('Create a Customer Account'),
             ),
           ],
         ),
@@ -131,6 +182,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _lastCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -144,84 +196,148 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Account')),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(SiragroSpacing.lg),
           children: [
-            if (auth.errorMessage != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: SiragroColors.accentRed.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  auth.errorMessage!,
-                  style: const TextStyle(color: SiragroColors.accentRed),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Join SIRAGRO',
+                      style: textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Create a customer account to track orders and save your basket.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: SiragroColors.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: SiragroSpacing.lg),
+                    if (auth.errorMessage != null) ...[
+                      _AuthErrorBanner(message: auth.errorMessage!),
+                      const SizedBox(height: SiragroSpacing.md),
+                    ],
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(SiragroSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _firstCtrl,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: const InputDecoration(
+                                      labelText: 'First name',
+                                    ),
+                                    validator: (v) =>
+                                        (v == null || v.trim().isEmpty)
+                                            ? 'Required'
+                                            : null,
+                                  ),
+                                ),
+                                const SizedBox(width: SiragroSpacing.sm),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _lastCtrl,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Last name',
+                                    ),
+                                    validator: (v) =>
+                                        (v == null || v.trim().isEmpty)
+                                            ? 'Required'
+                                            : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: SiragroSpacing.md),
+                            TextFormField(
+                              controller: _emailCtrl,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Email address',
+                                prefixIcon: Icon(Icons.mail_outline_rounded),
+                              ),
+                              validator: (v) => (v == null || !v.contains('@'))
+                                  ? 'Valid email required'
+                                  : null,
+                            ),
+                            const SizedBox(height: SiragroSpacing.md),
+                            TextFormField(
+                              controller: _passwordCtrl,
+                              obscureText: _obscure,
+                              textInputAction: TextInputAction.done,
+                              decoration: InputDecoration(
+                                labelText: 'Password (min 8 chars)',
+                                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                suffixIcon: IconButton(
+                                  tooltip: _obscure ? 'Show password' : 'Hide password',
+                                  onPressed: () =>
+                                      setState(() => _obscure = !_obscure),
+                                  icon: Icon(
+                                    _obscure
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
+                              ),
+                              validator: (v) => (v == null || v.length < 8)
+                                  ? 'Password must be at least 8 characters'
+                                  : null,
+                            ),
+                            const SizedBox(height: SiragroSpacing.lg),
+                            ElevatedButton(
+                              onPressed: auth.isLoading
+                                  ? null
+                                  : () async {
+                                      if (!_formKey.currentState!.validate()) {
+                                        return;
+                                      }
+                                      final ok = await ref
+                                          .read(authControllerProvider.notifier)
+                                          .register(
+                                            firstName: _firstCtrl.text,
+                                            lastName: _lastCtrl.text,
+                                            email: _emailCtrl.text,
+                                            password: _passwordCtrl.text,
+                                          );
+                                      if (ok && context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Account created. Check your email if verification is required.',
+                                            ),
+                                          ),
+                                        );
+                                        context.go('/account');
+                                      }
+                                    },
+                              child: Text(
+                                auth.isLoading ? 'Creating…' : 'Create Account',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
-            ],
-            TextFormField(
-              controller: _firstCtrl,
-              decoration: const InputDecoration(labelText: 'First name'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _lastCtrl,
-              decoration: const InputDecoration(labelText: 'Last name'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email address'),
-              validator: (v) =>
-                  (v == null || !v.contains('@')) ? 'Valid email required' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _passwordCtrl,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password (min 8 chars)'),
-              validator: (v) => (v == null || v.length < 8)
-                  ? 'Password must be at least 8 characters'
-                  : null,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: auth.isLoading
-                  ? null
-                  : () async {
-                      if (!_formKey.currentState!.validate()) return;
-                      final ok = await ref
-                          .read(authControllerProvider.notifier)
-                          .register(
-                            firstName: _firstCtrl.text,
-                            lastName: _lastCtrl.text,
-                            email: _emailCtrl.text,
-                            password: _passwordCtrl.text,
-                          );
-                      if (ok && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Account created. Check your email if verification is required.',
-                            ),
-                          ),
-                        );
-                        context.go('/account');
-                      }
-                    },
-              child: Text(auth.isLoading ? 'Creating…' : 'Create Account'),
             ),
           ],
         ),
@@ -251,46 +367,126 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Reset Password')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(SiragroSpacing.lg),
         children: [
-          const Text(
-            'Enter your account email and we will send a password recovery link.',
-            style: TextStyle(color: SiragroColors.textMuted),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _emailCtrl,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email address'),
-          ),
-          const SizedBox(height: 16),
-          if (_sent)
-            const Card(
-              child: Padding(
-                padding: EdgeInsets.all(14),
-                child: Text(
-                  'If an account exists for that email, a password reset link has been sent.',
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(SiragroSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Recover your password', style: textTheme.titleLarge),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Enter your account email and we will send a password recovery link.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: SiragroColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: SiragroSpacing.md),
+                      TextField(
+                        controller: _emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email address',
+                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: SiragroSpacing.md),
+                      if (_sent)
+                        Container(
+                          padding: const EdgeInsets.all(SiragroSpacing.md),
+                          decoration: BoxDecoration(
+                            color: SiragroColors.sageSoft,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: SiragroColors.sage.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.mark_email_read_outlined,
+                                color: SiragroColors.sage,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'If an account exists for that email, a password reset link has been sent.',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: SiragroColors.sage,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ElevatedButton(
+                          onPressed: auth.isLoading
+                              ? null
+                              : () async {
+                                  final ok = await ref
+                                      .read(authControllerProvider.notifier)
+                                      .sendPasswordReset(_emailCtrl.text);
+                                  if (ok && mounted) {
+                                    setState(() => _sent = true);
+                                  }
+                                },
+                          child: Text(
+                            auth.isLoading ? 'Sending…' : 'Send Reset Link',
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            )
-          else
-            ElevatedButton(
-              onPressed: auth.isLoading
-                  ? null
-                  : () async {
-                      final ok = await ref
-                          .read(authControllerProvider.notifier)
-                          .sendPasswordReset(_emailCtrl.text);
-                      if (ok && mounted) {
-                        setState(() => _sent = true);
-                      }
-                    },
-              child: Text(auth.isLoading ? 'Sending…' : 'Send Reset Link'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AuthErrorBanner extends StatelessWidget {
+  final String message;
+
+  const _AuthErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(SiragroSpacing.md),
+      decoration: BoxDecoration(
+        color: SiragroColors.accentRed.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: SiragroColors.accentRed.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: SiragroColors.accentRed),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: SiragroColors.accentRed,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );

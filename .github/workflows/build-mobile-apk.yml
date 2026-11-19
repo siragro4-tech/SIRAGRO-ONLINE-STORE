@@ -58,8 +58,13 @@ jobs:
           SIRAGRO_SUPABASE_URL: ${{ vars.SIRAGRO_STAGING_SUPABASE_URL }}
           SIRAGRO_SUPABASE_ANON_KEY: ${{ vars.SIRAGRO_STAGING_SUPABASE_ANON_KEY }}
         run: |
+          DESIGN_PREVIEW="false"
+          if [ -z "${SIRAGRO_API_BASE_URL}" ]; then
+            DESIGN_PREVIEW="true"
+          fi
           flutter build apk --debug \
             --dart-define=SIRAGRO_ENV=staging \
+            --dart-define=SIRAGRO_DESIGN_PREVIEW="${DESIGN_PREVIEW}" \
             --dart-define=SIRAGRO_API_BASE_URL="${SIRAGRO_API_BASE_URL}" \
             --dart-define=SIRAGRO_SUPABASE_URL="${SIRAGRO_SUPABASE_URL}" \
             --dart-define=SIRAGRO_SUPABASE_ANON_KEY="${SIRAGRO_SUPABASE_ANON_KEY}"

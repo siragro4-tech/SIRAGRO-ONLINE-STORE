@@ -5,6 +5,7 @@ import 'package:http/testing.dart';
 import 'package:siragro_mobile/core/config/app_config.dart';
 import 'package:siragro_mobile/core/errors/app_exception.dart';
 import 'package:siragro_mobile/core/networking/api_client.dart';
+import 'package:siragro_mobile/core/preview/design_preview_fixtures.dart';
 import 'package:siragro_mobile/core/storage/secure_token_storage.dart';
 import 'package:siragro_mobile/shared/models/fulfilment.dart';
 import 'package:siragro_mobile/shared/models/order.dart';
@@ -40,6 +41,24 @@ void main() {
       expect(cfg.isApiConfigured, isFalse);
       expect(cfg.isSupabaseConfigured, isFalse);
       expect(cfg.isStoreConnected, isFalse);
+      expect(cfg.isDesignPreview, isFalse);
+    });
+
+    test('design preview flag is opt-in and fixtures keep delivery unconfirmed', () {
+      const previewCfg = AppConfig(
+        environment: 'unconfigured',
+        apiBaseUrl: '',
+        supabaseUrl: '',
+        supabaseAnonKey: '',
+        appScheme: 'siragro',
+        designPreviewFlag: true,
+      );
+      expect(previewCfg.isDesignPreview, isTrue);
+      expect(previewCfg.isStoreConnected, isFalse);
+      expect(DesignPreviewFixtures.categories, isNotEmpty);
+      expect(DesignPreviewFixtures.products, isNotEmpty);
+      expect(DesignPreviewFixtures.fulfilment.deliveryAvailable, isFalse);
+      expect(DesignPreviewFixtures.fulfilment.pricingConfirmed, isFalse);
     });
   });
 

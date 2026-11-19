@@ -10,138 +10,161 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('My Account')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(SiragroSpacing.md),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: auth.isAuthenticated
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Signed In Customer',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: SiragroColors.textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          auth.user?.email ?? '',
-                          style: const TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () => context.push('/orders'),
-                                icon: const Icon(Icons.receipt_long),
-                                label: const Text('My Orders'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            OutlinedButton(
-                              onPressed: () => ref
-                                  .read(authControllerProvider.notifier)
-                                  .signOut(),
-                              child: const Text('Sign Out'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Shopping as Guest',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Sign in or create an account to view your order history and sync your basket.',
-                          style: TextStyle(color: SiragroColors.textMuted),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () => context.push('/auth/sign-in'),
-                                child: const Text('Sign In'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => context.push('/auth/register'),
-                                child: const Text('Register'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+          Container(
+            padding: const EdgeInsets.all(SiragroSpacing.lg),
+            decoration: BoxDecoration(
+              color: SiragroColors.brand,
+              borderRadius: BorderRadius.circular(18),
             ),
+            child: auth.isAuthenticated
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'CUSTOMER ACCOUNT',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: SiragroColors.brassSoft,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        auth.user?.email ?? '',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: SiragroSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: SiragroColors.brand,
+                              ),
+                              onPressed: () => context.push('/orders'),
+                              icon: const Icon(Icons.receipt_long_rounded),
+                              label: const Text('My Orders'),
+                            ),
+                          ),
+                          const SizedBox(width: SiragroSpacing.sm),
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: BorderSide(
+                                color: Colors.white.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            onPressed: () => ref
+                                .read(authControllerProvider.notifier)
+                                .signOut(),
+                            child: const Text('Sign Out'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'GUEST SHOPPER',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: SiragroColors.brassSoft,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Welcome to SIRAGRO',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Sign in or create an account to view your order history and sync your basket.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.86),
+                        ),
+                      ),
+                      const SizedBox(height: SiragroSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: SiragroColors.brand,
+                              ),
+                              onPressed: () => context.push('/auth/sign-in'),
+                              child: const Text('Sign In'),
+                            ),
+                          ),
+                          const SizedBox(width: SiragroSpacing.sm),
+                          Expanded(
+                            child: OutlinedButton(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.45),
+                                ),
+                              ),
+                              onPressed: () => context.push('/auth/register'),
+                              child: const Text('Register'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
-          const SizedBox(height: 20),
-          const Text(
+          const SizedBox(height: SiragroSpacing.lg),
+          Text(
             'Store & Customer Care',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
+            style: textTheme.labelLarge?.copyWith(
               color: SiragroColors.textMuted,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: SiragroSpacing.sm),
           Card(
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.local_shipping_outlined),
-                  title: const Text('Delivery & Collection Info'),
-                  trailing: const Icon(Icons.chevron_right),
+                _AccountLinkTile(
+                  icon: Icons.local_shipping_outlined,
+                  title: 'Delivery & Collection Info',
                   onTap: () => context.push('/support/delivery'),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.storefront_outlined),
-                  title: const Text('About SIRAGRO'),
-                  trailing: const Icon(Icons.chevron_right),
+                _AccountLinkTile(
+                  icon: Icons.storefront_outlined,
+                  title: 'About SIRAGRO',
                   onTap: () => context.push('/support/about'),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.phone_outlined),
-                  title: const Text('Contact Store'),
-                  trailing: const Icon(Icons.chevron_right),
+                _AccountLinkTile(
+                  icon: Icons.phone_outlined,
+                  title: 'Contact Store',
                   onTap: () => context.push('/support/contact'),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined),
-                  title: const Text('Privacy Policy'),
-                  trailing: const Icon(Icons.chevron_right),
+                _AccountLinkTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacy Policy',
                   onTap: () => context.push('/support/privacy'),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.description_outlined),
-                  title: const Text('Terms & Conditions'),
-                  trailing: const Icon(Icons.chevron_right),
+                _AccountLinkTile(
+                  icon: Icons.description_outlined,
+                  title: 'Terms & Conditions',
                   onTap: () => context.push('/support/terms'),
                 ),
               ],
@@ -149,6 +172,42 @@ class AccountScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AccountLinkTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  const _AccountLinkTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: SiragroColors.surfaceWarm,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 19, color: SiragroColors.brand),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: SiragroColors.textMuted,
+      ),
+      onTap: onTap,
     );
   }
 }

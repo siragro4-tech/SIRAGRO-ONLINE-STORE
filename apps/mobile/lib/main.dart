@@ -42,38 +42,58 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: SiragroTheme.light(),
-        home: const Scaffold(
-          backgroundColor: SiragroColors.brand,
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SiragroLogo(size: 76),
-                SizedBox(height: 16),
-                Text(
-                  'SIRAGRO',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.2,
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      child: !_ready
+          ? MaterialApp(
+              key: const ValueKey('bootstrap-splash'),
+              debugShowCheckedModeBanner: false,
+              theme: SiragroTheme.light(),
+              home: Scaffold(
+                backgroundColor: SiragroColors.brand,
+                body: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SiragroLogo(size: 80),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'SIRAGRO',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'FRESH GROCERY • HAYES',
+                        style: TextStyle(
+                          color: SiragroColors.brassSoft,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 18),
-                CircularProgressIndicator(color: Colors.white),
-              ],
+              ),
+            )
+          : const ProviderScope(
+              key: ValueKey('bootstrap-app'),
+              child: SiragroApp(),
             ),
-          ),
-        ),
-      );
-    }
-
-    return const ProviderScope(
-      child: SiragroApp(),
     );
   }
 }

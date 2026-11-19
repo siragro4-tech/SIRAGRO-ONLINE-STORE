@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/providers/app_providers.dart';
+import '../core/widgets/motion.dart';
 import '../features/account/account_screen.dart';
 import '../features/auth/auth_screens.dart';
 import '../features/basket/basket_controller.dart';
@@ -11,6 +14,7 @@ import '../features/home/home_screen.dart';
 import '../features/orders/orders_screen.dart';
 import '../features/product/product_detail_screen.dart';
 import '../features/support/support_screens.dart';
+import 'theme/siragro_theme.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -60,55 +64,91 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/product/:slug',
-        builder: (_, state) => ProductDetailScreen(
-          slug: state.pathParameters['slug'] ?? '',
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: ProductDetailScreen(
+            slug: state.pathParameters['slug'] ?? '',
+          ),
         ),
       ),
       GoRoute(
         path: '/checkout',
-        builder: (_, __) => const CheckoutScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const CheckoutScreen(),
+        ),
       ),
       GoRoute(
         path: '/auth/sign-in',
-        builder: (_, __) => const SignInScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const SignInScreen(),
+        ),
       ),
       GoRoute(
         path: '/auth/register',
-        builder: (_, __) => const RegisterScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const RegisterScreen(),
+        ),
       ),
       GoRoute(
         path: '/auth/forgot-password',
-        builder: (_, __) => const ForgotPasswordScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const ForgotPasswordScreen(),
+        ),
       ),
       GoRoute(
         path: '/orders',
-        builder: (_, __) => const OrdersScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const OrdersScreen(),
+        ),
       ),
       GoRoute(
         path: '/orders/:id',
-        builder: (_, state) => OrderDetailScreen(
-          orderId: state.pathParameters['id'] ?? '',
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: OrderDetailScreen(
+            orderId: state.pathParameters['id'] ?? '',
+          ),
         ),
       ),
       GoRoute(
         path: '/support/about',
-        builder: (_, __) => const AboutSiragroScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const AboutSiragroScreen(),
+        ),
       ),
       GoRoute(
         path: '/support/contact',
-        builder: (_, __) => const ContactSiragroScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const ContactSiragroScreen(),
+        ),
       ),
       GoRoute(
         path: '/support/delivery',
-        builder: (_, __) => const DeliveryInfoScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const DeliveryInfoScreen(),
+        ),
       ),
       GoRoute(
         path: '/support/privacy',
-        builder: (_, __) => const PrivacyPolicyScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const PrivacyPolicyScreen(),
+        ),
       ),
       GoRoute(
         path: '/support/terms',
-        builder: (_, __) => const TermsScreen(),
+        pageBuilder: (_, state) => siragroFadeSlidePage(
+          key: state.pageKey,
+          child: const TermsScreen(),
+        ),
       ),
     ],
   );
@@ -121,48 +161,128 @@ class _AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final basketCount = ref.watch(basketControllerProvider).valueOrNull?.itemCount ?? 0;
+    final basketCount =
+        ref.watch(basketControllerProvider).valueOrNull?.itemCount ?? 0;
+    final isDesignPreview = ref.watch(appConfigProvider).isDesignPreview;
+    final animDuration = SiragroMotion.duration(
+      context,
+      normal: const Duration(milliseconds: 200),
+    );
 
     return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (idx) {
-          navigationShell.goBranch(
-            idx,
-            initialLocation: idx == navigationShell.currentIndex,
-          );
-        },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.storefront_outlined),
-            selectedIcon: Icon(Icons.storefront),
-            label: 'Shop',
-          ),
-          NavigationDestination(
-            icon: Badge(
-              isLabelVisible: basketCount > 0,
-              label: Text('$basketCount'),
-              child: const Icon(Icons.shopping_basket_outlined),
+      body: Column(
+        children: [
+          if (isDesignPreview)
+            Material(
+              color: SiragroColors.brassTint,
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: SiragroColors.brass, width: 1),
+                    ),
+                  ),
+                  child: const Text(
+                    'DESIGN PREVIEW • SAMPLE DATA (No live backend calls)',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.6,
+                      color: SiragroColors.brandDark,
+                    ),
+                  ),
+                ),
+              ),
             ),
-            selectedIcon: Badge(
-              isLabelVisible: basketCount > 0,
-              label: Text('$basketCount'),
-              child: const Icon(Icons.shopping_basket),
-            ),
-            label: 'Basket',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Account',
-          ),
+          Expanded(child: navigationShell),
         ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: SiragroColors.border)),
+        ),
+        child: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: (idx) {
+            HapticFeedback.selectionClick();
+            navigationShell.goBranch(
+              idx,
+              initialLocation: idx == navigationShell.currentIndex,
+            );
+          },
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.storefront_outlined),
+              selectedIcon: Icon(Icons.storefront_rounded),
+              label: 'Shop',
+            ),
+            NavigationDestination(
+              icon: _AnimatedBasketBadge(
+                count: basketCount,
+                duration: animDuration,
+                selected: false,
+              ),
+              selectedIcon: _AnimatedBasketBadge(
+                count: basketCount,
+                duration: animDuration,
+                selected: true,
+              ),
+              label: 'Basket',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded),
+              selectedIcon: Icon(Icons.person_rounded),
+              label: 'Account',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedBasketBadge extends StatelessWidget {
+  final int count;
+  final Duration duration;
+  final bool selected;
+
+  const _AnimatedBasketBadge({
+    required this.count,
+    required this.duration,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Badge(
+      isLabelVisible: count > 0,
+      backgroundColor: SiragroColors.sage,
+      label: AnimatedSwitcher(
+        duration: duration,
+        transitionBuilder: (child, anim) =>
+            ScaleTransition(scale: anim, child: child),
+        child: Text(
+          '$count',
+          key: ValueKey<int>(count),
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      child: Icon(
+        selected
+            ? Icons.shopping_basket_rounded
+            : Icons.shopping_basket_outlined,
       ),
     );
   }

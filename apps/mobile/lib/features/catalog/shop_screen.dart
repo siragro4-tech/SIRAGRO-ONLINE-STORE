@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../app/theme/siragro_theme.dart';
 import '../../core/errors/app_exception.dart';
+import '../../core/preview/design_preview_fixtures.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/widgets/motion.dart';
 import '../../core/widgets/state_views.dart';
 import '../../shared/models/product.dart';
 import '../../shared/widgets/product_card.dart';
@@ -78,6 +81,38 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
 
   Future<void> _fetchPage({required bool reset}) async {
     final config = ref.read(appConfigProvider);
+    if (config.isDesignPreview) {
+      final q = _searchCtrl.text.trim().toLowerCase();
+      var list = DesignPreviewFixtures.products.where((p) {
+        if (_selectedCategory != null && p.category?.slug != _selectedCategory) {
+          return false;
+        }
+        if (_inStockOnly && p.isOutOfStock) return false;
+        if (q.isNotEmpty &&
+            !p.name.toLowerCase().contains(q) &&
+            !(p.brand?.toLowerCase().contains(q) ?? false)) {
+          return false;
+        }
+        return true;
+      }).toList();
+
+      if (_sort == 'price_asc') {
+        list.sort((a, b) => a.price.compareTo(b.price));
+      } else if (_sort == 'price_desc') {
+        list.sort((a, b) => b.price.compareTo(a.price));
+      } else if (_sort == 'name_asc') {
+        list.sort((a, b) => a.name.compareTo(b.name));
+      }
+
+      setState(() {
+        _items = list;
+        _hasMore = false;
+        _isLoading = false;
+        _error = null;
+      });
+      return;
+    }
+
     if (!config.isApiConfigured) {
       setState(() {
         _error =
@@ -139,18 +174,119 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     }
   }
 
+  Future<void> _openFilterSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: SiragroColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sort & Availability',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Featured'),
+                      selected: _sort == 'featured',
+                      onSelected: (_) {
+                        setState(() => _sort = 'featured');
+                        setSheetState(() {});
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('Price: Low–High'),
+                      selected: _sort == 'price_asc',
+                      onSelected: (_) {
+                        setState(() => _sort = 'price_asc');
+                        setSheetState(() {});
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('Price: High–Low'),
+                      selected: _sort == 'price_desc',
+                      onSelected: (_) {
+                        setState(() => _sort = 'price_desc');
+                        setSheetState(() {});
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('Name: A–Z'),
+                      selected: _sort == 'name_asc',
+                      onSelected: (_) {
+                        setState(() => _sort = 'name_asc');
+                        setSheetState(() {});
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'In Stock Only',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  value: _inStockOnly,
+                  onChanged: (v) {
+                    setState(() => _inStockOnly = v);
+                    setSheetState(() {});
+                  },
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _fetchPage(reset: true);
+                    },
+                    child: const Text('Apply Filters'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final homeAsync = ref.watch(homeDataProvider);
     final categories = homeAsync.valueOrNull?.categories ?? const [];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Shop Catalogue')),
+      appBar: AppBar(
+        title: const Text('Shop Catalogue'),
+        actions: [
+          IconButton(
+            tooltip: 'Sort & filter',
+            onPressed: _openFilterSheet,
+            icon: const Icon(Icons.tune_rounded),
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          // Search & Filter controls
           Container(
-            color: Colors.white,
+            decoration: const BoxDecoration(
+              color: SiragroColors.surface,
+              border: Border(bottom: BorderSide(color: SiragroColors.border)),
+            ),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
               children: [
@@ -161,7 +297,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: 'Search 1,500+ products by name or brand…',
-                    prefixIcon: const Icon(Icons.search),
+                    prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: _searchCtrl.text.isNotEmpty
                         ? IconButton(
                             tooltip: 'Clear search',
@@ -169,7 +305,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                               _searchCtrl.clear();
                               _fetchPage(reset: true);
                             },
-                            icon: const Icon(Icons.clear),
+                            icon: const Icon(Icons.clear_rounded),
                           )
                         : null,
                   ),
@@ -179,42 +315,10 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      // Sort selector
-                      DropdownButton<String>(
-                        value: _sort,
-                        underline: const SizedBox.shrink(),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'featured',
-                            child: Text('Sort: Featured'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'price_asc',
-                            child: Text('Price: Low to High'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'price_desc',
-                            child: Text('Price: High to Low'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'name_asc',
-                            child: Text('Name: A–Z'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val == null) return;
-                          setState(() => _sort = val);
-                          _fetchPage(reset: true);
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      FilterChip(
-                        label: const Text('In Stock Only'),
-                        selected: _inStockOnly,
-                        onSelected: (selected) {
-                          setState(() => _inStockOnly = selected);
-                          _fetchPage(reset: true);
-                        },
+                      ActionChip(
+                        avatar: const Icon(Icons.tune_rounded, size: 16),
+                        label: const Text('Filter & Sort'),
+                        onPressed: _openFilterSheet,
                       ),
                       if (categories.isNotEmpty) ...[
                         const SizedBox(width: 8),
@@ -246,18 +350,21 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
               ],
             ),
           ),
-
           Expanded(
             child: _isLoading
-                ? const LoadingStateView(message: 'Loading products…')
+                ? const SingleChildScrollView(
+                    padding: EdgeInsets.only(top: 16),
+                    child: SkeletonProductGrid(itemCount: 6),
+                  )
                 : _error != null
                     ? ErrorRetryView(
+                        title: 'Catalogue Unavailable',
                         message: _error!,
                         onRetry: () => _fetchPage(reset: true),
                       )
                     : _items.isEmpty
                         ? EmptyStateView(
-                            icon: Icons.search_off,
+                            icon: Icons.search_off_rounded,
                             title: 'No matching products found',
                             subtitle:
                                 'Try adjusting your search term or clearing filters.',
@@ -302,40 +409,46 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                                       itemCount: _items.length,
                                       itemBuilder: (context, index) {
                                         final product = _items[index];
-                                        return ProductCard(
-                                          product: product,
-                                          isAdding:
-                                              _addingProductId == product.id,
-                                          onTap: () => context.push(
-                                            '/product/${product.slug}',
-                                          ),
-                                          onAddToBasket: () async {
-                                            setState(() =>
-                                                _addingProductId = product.id);
-                                            final err = await ref
-                                                .read(basketControllerProvider
-                                                    .notifier)
-                                                .addItem(product.id);
-                                            if (!context.mounted) return;
-                                            setState(
-                                                () => _addingProductId = null);
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  err ??
-                                                      'Added ${product.name} to basket',
+                                        return StaggeredEntrance(
+                                          index: index,
+                                          child: ProductCard(
+                                            product: product,
+                                            isAdding:
+                                                _addingProductId == product.id,
+                                            onTap: () => context.push(
+                                              '/product/${product.slug}',
+                                            ),
+                                            onAddToBasket: () async {
+                                              setState(() => _addingProductId =
+                                                  product.id);
+                                              final err = await ref
+                                                  .read(basketControllerProvider
+                                                      .notifier)
+                                                  .addItem(product.id);
+                                              if (!context.mounted) return;
+                                              setState(() =>
+                                                  _addingProductId = null);
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                  content: Text(
+                                                    err ??
+                                                        'Added ${product.name} to basket',
+                                                  ),
+                                                  duration: const Duration(
+                                                    seconds: 2,
+                                                  ),
                                                 ),
-                                                duration:
-                                                    const Duration(seconds: 2),
-                                              ),
-                                            );
-                                          },
+                                              );
+                                            },
+                                          ),
                                         );
                                       },
                                     ),
                                     if (_hasMore) ...[
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: 18),
                                       Center(
                                         child: OutlinedButton(
                                           onPressed: _isLoadingMore

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/siragro_theme.dart';
 import '../../core/errors/app_exception.dart';
+import '../../core/preview/design_preview_fixtures.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/widgets/state_views.dart';
 import '../../shared/models/fulfilment.dart';
@@ -11,6 +12,9 @@ import '../basket/basket_controller.dart';
 final fulfilmentAvailabilityProvider =
     FutureProvider.autoDispose<FulfilmentAvailability>((ref) async {
   final config = ref.watch(appConfigProvider);
+  if (config.isDesignPreview) {
+    return DesignPreviewFixtures.fulfilment;
+  }
   if (!config.isApiConfigured) {
     return const FulfilmentAvailability.unverified();
   }
@@ -68,6 +72,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _recalculateServerTotal() async {
+    if (ref.read(appConfigProvider).isDesignPreview) return;
     try {
       final api = ref.read(apiClientProvider);
       final data = await api.post(
@@ -95,6 +100,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   Future<void> _submitCheckout() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (ref.read(appConfigProvider).isDesignPreview) {
+      setState(() {
+        _statusMessage =
+            'Design Preview Mode: Payments and order creation are disabled in preview mode.';
+        _isBlockedError = true;
+      });
+      return;
+    }
 
     setState(() {
       _isSubmitting = true;
@@ -169,7 +183,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               onRetry: () => ref.invalidate(fulfilmentAvailabilityProvider),
             ),
             data: (fulfilment) {
-              // Ensure selected option stays valid if server disabled delivery
               if (_fulfilmentType == 'delivery' &&
                   !fulfilment.deliveryAvailable &&
                   fulfilment.collectionAvailable) {
@@ -186,71 +199,49 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // 1. Fulfilment Selection (Fail-Closed)
-                    const Text(
+                    Text(
                       '1. Fulfilment Method',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     Card(
                       child: Column(
                         children: [
-                          RadioListTile<String>(
-                            value: 'collection',
-                            groupValue: _fulfilmentType,
-                            onChanged: fulfilment.collectionAvailable
-                                ? (v) {
-                                    setState(() => _fulfilmentType = v!);
-                                    _recalculateServerTotal();
-                                  }
-                                : null,
-                            title: const Text(
-                              'In-Store Collection (Free £0.00)',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text(
-                              fulfilment.collectionAvailable
-                                  ? '147 North Hyde Road, Hayes UB3 4NS'
-                                  : (fulfilment.collectionUnavailableReason ??
-                                      'Currently unavailable'),
-                            ),
+                          _FulfilmentOptionTile(
+                            title: 'In-Store Collection (Free £0.00)',
+                            subtitle: fulfilment.collectionAvailable
+                                ? '147 North Hyde Road, Hayes UB3 4NS'
+                                : (fulfilment.collectionUnavailableReason ??
+                                    'Currently unavailable'),
+                            selected: _fulfilmentType == 'collection',
+                            enabled: fulfilment.collectionAvailable,
+                            onTap: () {
+                              setState(() => _fulfilmentType = 'collection');
+                              _recalculateServerTotal();
+                            },
                           ),
                           const Divider(height: 1),
-                          RadioListTile<String>(
-                            value: 'delivery',
-                            groupValue: _fulfilmentType,
-                            onChanged: fulfilment.deliveryAvailable
-                                ? (v) {
-                                    setState(() => _fulfilmentType = v!);
-                                    _recalculateServerTotal();
-                                  }
-                                : null,
-                            title: const Text(
-                              'Home Delivery',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text(
-                              fulfilment.deliveryAvailable
-                                  ? 'Fee calculated on server from postcode'
-                                  : (fulfilment.deliveryUnavailableReason ??
-                                      'Home delivery is currently unavailable while delivery fees and boundaries await store confirmation.'),
-                            ),
+                          _FulfilmentOptionTile(
+                            title: 'Home Delivery',
+                            subtitle: fulfilment.deliveryAvailable
+                                ? 'Fee calculated on server from postcode'
+                                : (fulfilment.deliveryUnavailableReason ??
+                                    'Home delivery is currently unavailable while delivery fees and boundaries await store confirmation.'),
+                            selected: _fulfilmentType == 'delivery',
+                            enabled: fulfilment.deliveryAvailable,
+                            onTap: () {
+                              setState(() => _fulfilmentType = 'delivery');
+                              _recalculateServerTotal();
+                            },
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 20),
 
-                    // 2. Contact Details
-                    const Text(
+                    Text(
                       '2. Contact Details',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
@@ -281,13 +272,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     ),
 
                     if (_fulfilmentType == 'delivery') ...[
-                      const SizedBox(height: 18),
-                      const Text(
+                      const SizedBox(height: 20),
+                      Text(
                         '3. Delivery Address',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -359,14 +347,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     const SizedBox(height: 18),
                     Card(
                       child: Padding(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.all(16),
                         child: Column(
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Server Subtotal'),
-                                Text('£${basket.subtotal.toStringAsFixed(2)}'),
+                                Text(
+                                  '£${basket.subtotal.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontFeatures: [FontFeature.tabularFigures()],
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 6),
@@ -374,10 +367,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Text('Fulfilment Charge'),
-                                Text('£${deliveryFee.toStringAsFixed(2)}'),
+                                Text(
+                                  '£${deliveryFee.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontFeatures: [FontFeature.tabularFigures()],
+                                  ),
+                                ),
                               ],
                             ),
-                            const Divider(height: 18),
+                            const Divider(height: 20),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -394,6 +392,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                     fontWeight: FontWeight.w900,
                                     fontSize: 18,
                                     color: SiragroColors.brand,
+                                    fontFeatures: [FontFeature.tabularFigures()],
                                   ),
                                 ),
                               ],
@@ -409,13 +408,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: (_isBlockedError
-                                  ? SiragroColors.accentGold
-                                  : SiragroColors.accentRed)
-                              .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                                  ? SiragroColors.brassTint
+                                  : SiragroColors.accentRed.withValues(alpha: 0.08)),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: _isBlockedError
-                                ? SiragroColors.accentGold
+                                ? SiragroColors.brass
                                 : SiragroColors.accentRed,
                           ),
                         ),
@@ -451,6 +449,72 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _FulfilmentOptionTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _FulfilmentOptionTile({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: !enabled
+                  ? SiragroColors.borderStrong
+                  : selected
+                      ? SiragroColors.brand
+                      : SiragroColors.textMuted,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: enabled
+                          ? SiragroColors.textPrimary
+                          : SiragroColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: SiragroColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

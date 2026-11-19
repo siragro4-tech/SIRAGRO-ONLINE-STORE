@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../app/theme/siragro_theme.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/widgets/motion.dart';
 import '../../core/widgets/state_views.dart';
 import '../../shared/models/order.dart';
 import '../auth/auth_controller.dart';
@@ -37,11 +38,13 @@ class OrdersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
+    final textTheme = Theme.of(context).textTheme;
+
     if (!auth.isAuthenticated) {
       return Scaffold(
         appBar: AppBar(title: const Text('My Orders')),
         body: EmptyStateView(
-          icon: Icons.lock_outline,
+          icon: Icons.lock_outline_rounded,
           title: 'Sign in to view your orders',
           subtitle: 'Order history is available for signed-in customer accounts.',
           action: ElevatedButton(
@@ -76,66 +79,87 @@ class OrdersScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
+            color: SiragroColors.brand,
             onRefresh: () async => ref.invalidate(ordersListProvider),
             child: ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(SiragroSpacing.md),
               itemCount: orders.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: SiragroSpacing.sm),
               itemBuilder: (context, index) {
                 final order = orders[index];
-                return Card(
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(14),
-                    onTap: () => context.push('/orders/${order.id}'),
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '#${order.orderNumber}',
-                          style: const TextStyle(fontWeight: FontWeight.w900),
-                        ),
-                        Text(
-                          '£${order.total.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: SiragroColors.brand,
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (order.createdAt != null)
-                            Text(
-                              DateFormat('dd MMM yyyy, HH:mm')
-                                  .format(order.createdAt!.toLocal()),
-                              style: const TextStyle(fontSize: 12),
+                return StaggeredEntrance(
+                  index: index,
+                  child: Card(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => context.push('/orders/${order.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(SiragroSpacing.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '#${order.orderNumber}',
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '£${order.total.toStringAsFixed(2)}',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: SiragroColors.brand,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: SiragroColors.textMuted,
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              _StatusBadge(
-                                label: 'Payment: ${order.paymentStatus.toUpperCase()}',
-                                color: order.paymentStatus == 'paid'
-                                    ? SiragroColors.accentGreen
-                                    : SiragroColors.accentGold,
-                              ),
-                              _StatusBadge(
-                                label:
-                                    'Fulfilment: ${order.status.replaceAll('_', ' ').toUpperCase()}',
-                                color: SiragroColors.brand,
+                            if (order.createdAt != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                DateFormat('dd MMM yyyy, HH:mm')
+                                    .format(order.createdAt!.toLocal()),
+                                style: textTheme.bodySmall,
                               ),
                             ],
-                          ),
-                        ],
+                            const SizedBox(height: SiragroSpacing.sm),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                _StatusBadge(
+                                  label:
+                                      'Payment: ${order.paymentStatus.toUpperCase()}',
+                                  color: order.paymentStatus == 'paid'
+                                      ? SiragroColors.sage
+                                      : SiragroColors.brass,
+                                ),
+                                _StatusBadge(
+                                  label:
+                                      'Fulfilment: ${order.status.replaceAll('_', ' ').toUpperCase()}',
+                                  color: SiragroColors.brand,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    trailing: const Icon(Icons.chevron_right),
                   ),
                 );
               },
@@ -155,6 +179,7 @@ class OrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orderAsync = ref.watch(orderDetailProvider(orderId));
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Order Details')),
@@ -165,22 +190,19 @@ class OrderDetailScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(orderDetailProvider(orderId)),
         ),
         data: (order) => ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(SiragroSpacing.md),
           children: [
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(SiragroSpacing.md),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Order #${order.orderNumber}',
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: textTheme.titleLarge,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: SiragroSpacing.sm),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -188,8 +210,8 @@ class OrderDetailScreen extends ConsumerWidget {
                         _StatusBadge(
                           label: 'Payment: ${order.paymentStatus.toUpperCase()}',
                           color: order.paymentStatus == 'paid'
-                              ? SiragroColors.accentGreen
-                              : SiragroColors.accentGold,
+                              ? SiragroColors.sage
+                              : SiragroColors.brass,
                         ),
                         _StatusBadge(
                           label:
@@ -198,21 +220,23 @@ class OrderDetailScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: SiragroSpacing.sm),
                     Text(
                       'Method: ${order.fulfilmentType == 'delivery' ? 'Home Delivery' : 'In-Store Collection'}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            const Text(
+            const SizedBox(height: SiragroSpacing.md),
+            Text(
               'Items (Stored Order Snapshot)',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              style: textTheme.titleMedium,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: SiragroSpacing.sm),
             Card(
               child: Column(
                 children: [
@@ -224,47 +248,61 @@ class OrderDetailScreen extends ConsumerWidget {
                       ),
                       subtitle: Text(
                         '${item.quantity} × £${item.unitPrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
                       ),
                       trailing: Text(
                         '£${item.lineTotal.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
                   ),
                   const Divider(height: 1),
                   Padding(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(SiragroSpacing.md),
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Subtotal'),
-                            Text('£${order.subtotal.toStringAsFixed(2)}'),
+                            Text(
+                              '£${order.subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text('Delivery Charge'),
-                            Text('£${order.deliveryCharge.toStringAsFixed(2)}'),
+                            Text(
+                              '£${order.deliveryCharge.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
                           ],
                         ),
-                        const Divider(height: 14),
+                        const Divider(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Saved Total',
-                              style: TextStyle(fontWeight: FontWeight.w900),
-                            ),
+                            Text('Saved Total', style: textTheme.titleMedium),
                             Text(
                               '£${order.total.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 17,
+                              style: textTheme.titleLarge?.copyWith(
                                 color: SiragroColors.brand,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
                             ),
                           ],
@@ -291,11 +329,11 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Text(
         label,

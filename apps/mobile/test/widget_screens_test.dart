@@ -46,7 +46,7 @@ void main() {
             child: ProductCard(
               product: product,
               onTap: () {},
-              onAddToBasket: () {},
+              onAddToBasket: () async {},
             ),
           ),
         ),
