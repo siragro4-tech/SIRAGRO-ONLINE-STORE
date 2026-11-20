@@ -24,8 +24,10 @@ class SiragroColors {
   // Restrained Accents
   static const Color sage = Color(0xFF3F6B52);
   static const Color sageTint = Color(0xFFEBF2EE);
+  static const Color sageSoft = sageTint;
   static const Color brass = Color(0xFFB08948);
   static const Color brassTint = Color(0xFFF9F3E8);
+  static const Color brassSoft = Color(0xFFE6CFA3);
   static const Color accentRed = Color(0xFFB91C1C);
   static const Color accentGreen = sage;
   static const Color accentGold = brass;
