@@ -31,11 +31,12 @@ jobs:
           channel: "stable"
           cache: true
 
-      - name: Generate Android shell without overwriting app code
+      - name: Generate Android & iOS shells without overwriting app code
         run: |
-          if [ ! -d "apps/mobile/android" ]; then
-            flutter create --platforms=android --org uk.co.siragro --project-name siragro_mobile temp_mobile_shell
-            cp -r temp_mobile_shell/android apps/mobile/android
+          if [ ! -d "apps/mobile/android" ] || [ ! -d "apps/mobile/ios" ]; then
+            flutter create --platforms=android,ios --org uk.co.siragro --project-name siragro_mobile temp_mobile_shell
+            [ -d "apps/mobile/android" ] || cp -r temp_mobile_shell/android apps/mobile/android
+            [ -d "apps/mobile/ios" ] || cp -r temp_mobile_shell/ios apps/mobile/ios
             rm -rf temp_mobile_shell
           fi
 
