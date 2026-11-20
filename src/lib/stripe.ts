@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import type { BasketItem } from "@/lib/basket";
+import type { StripeCheckoutLineItemInput } from "@/lib/checkout-flow";
 
 /**
  * Initializes the Stripe client with the secret key from environment variables.
@@ -22,7 +22,7 @@ export function getStripeClient(): Stripe {
 }
 
 export type CreateCheckoutSessionParams = {
-  items: BasketItem[];
+  items: StripeCheckoutLineItemInput[];
   fulfilmentType: "delivery" | "collection";
   deliveryFee: number;
   customerName: string;
@@ -36,6 +36,8 @@ export type CreateCheckoutSessionParams = {
   };
   hasAgeRestrictedItems: boolean;
   profileId?: string | null;
+  draftId?: string;
+  idempotencyKey?: string;
 };
 
 /**
@@ -55,6 +57,8 @@ export async function createStripeCheckoutSession(params: CreateCheckoutSessionP
     deliveryAddress,
     hasAgeRestrictedItems,
     profileId,
+    draftId,
+    idempotencyKey,
   } = params;
 
   // 1. Build line items from server-verified basket items
@@ -85,24 +89,31 @@ export async function createStripeCheckoutSession(params: CreateCheckoutSessionP
     });
   }
 
-  // 3. Create Checkout Session
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    customer_email: customerEmail,
-    line_items: lineItems,
-    success_url: `${siteUrl}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${siteUrl}/checkout?cancelled=true`,
-    metadata: {
-      customer_name: customerName,
+  // 3. Create Checkout Session (with idempotency key when draftId is provided)
+  const metadata: Record<string, string> = draftId
+    ? { draft_id: draftId }
+    : {
+        customer_name: customerName,
+        customer_email: customerEmail,
+        customer_phone: customerPhone,
+        fulfilment_type: fulfilmentType,
+        delivery_fee: deliveryFee.toString(),
+        has_age_restricted_items: hasAgeRestrictedItems ? "true" : "false",
+        profile_id: profileId || "",
+        delivery_address: deliveryAddress ? JSON.stringify(deliveryAddress) : "",
+      };
+
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "payment",
       customer_email: customerEmail,
-      customer_phone: customerPhone,
-      fulfilment_type: fulfilmentType,
-      delivery_fee: deliveryFee.toString(),
-      has_age_restricted_items: hasAgeRestrictedItems ? "true" : "false",
-      profile_id: profileId || "",
-      delivery_address: deliveryAddress ? JSON.stringify(deliveryAddress) : "",
+      line_items: lineItems,
+      success_url: `${siteUrl}/order-confirmation?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/checkout?cancelled=true`,
+      metadata,
     },
-  });
+    idempotencyKey ? { idempotencyKey } : undefined
+  );
 
   return session;
 }

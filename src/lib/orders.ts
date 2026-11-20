@@ -8,9 +8,8 @@ import {
   isLegacyNotificationConstraintError,
   resolveNotificationRecord,
 } from "@/lib/email-status";
-import { getStripeClient } from "@/lib/stripe";
 import { validatePaidGbpStripeSession } from "@/lib/stripe-rules";
-import { recordAdminActivity, recordInventoryAdjustment } from "@/lib/activity";
+import { recordAdminActivity } from "@/lib/activity";
 import type { Json } from "@/types/database.types";
 
 function formatDeliveryAddress(raw: unknown): string | null {
@@ -45,13 +44,21 @@ export type OrderRecord = {
   }>;
 };
 
+export type PaidOrderProcessResult =
+  | { status: "ok"; order: OrderRecord }
+  | { status: "reconciliation_required" };
+
 /**
- * Creates an order in the database idempotently upon verified Stripe payment.
+ * Processes a verified paid Stripe Checkout Session strictly via the atomic
+ * `process_paid_order_from_draft` RPC. Legacy sessions without a `draft_id`
+ * never fall through to name-matching or non-atomic stock updates; instead they
+ * are recorded for manual staff reconciliation.
  */
 export async function createOrderFromStripeSession(
-  session: Stripe.Checkout.Session
-): Promise<OrderRecord | null> {
-  const stripe = getStripeClient();
+  session: Stripe.Checkout.Session,
+  eventId?: string,
+  eventType?: string
+): Promise<PaidOrderProcessResult | null> {
   const supabase = createAdminClient();
 
   const sessionId = session.id;
@@ -85,335 +92,160 @@ export async function createOrderFromStripeSession(
     throw new Error(sessionCheck.reason);
   }
 
-  // 1. IDEMPOTENCY CHECK:
-  // If an order has already been created for this Stripe checkout session, return it immediately.
-  const { data: existingOrder } = await supabase
-    .from("orders")
-    .select("*")
-    .eq("stripe_checkout_session_id", sessionId)
-    .maybeSingle();
+  // 1. ATOMIC DRAFT-BASED PROCESSING (when draft_id & eventId are provided)
+  const draftId = session.metadata?.draft_id?.trim();
+  if (draftId && eventId) {
+    const orderNumber = `SIR-${Math.floor(100000 + Math.random() * 900000)}`;
+    const { data: rpcRaw, error: rpcErr } = await supabase.rpc(
+      "process_paid_order_from_draft",
+      {
+        p_event_id: eventId,
+        p_event_type: eventType || "checkout.session.completed",
+        p_draft_id: draftId,
+        p_stripe_session_id: sessionId,
+        p_payment_intent_id: paymentIntentId,
+        p_order_number: orderNumber,
+        p_amount_total_pence: session.amount_total ?? -1,
+        p_currency: session.currency || "",
+      }
+    );
 
-  if (existingOrder) {
-    const { data: existingItems } = await supabase
-      .from("order_items")
-      .select("*")
-      .eq("order_id", existingOrder.id);
+    if (rpcErr) {
+      throw new Error(`Atomic order processing failed: ${rpcErr.message}`);
+    }
 
-    return {
-      id: existingOrder.id,
-      orderNumber: existingOrder.order_number,
-      customerName: existingOrder.customer_name,
-      customerEmail: existingOrder.customer_email,
-      customerPhone: existingOrder.customer_phone,
-      fulfilmentType: existingOrder.fulfilment_type as "delivery" | "collection",
-      deliveryAddress: formatDeliveryAddress(existingOrder.delivery_address),
-      subtotal: Number(existingOrder.subtotal),
-      deliveryCharge: Number(existingOrder.delivery_charge),
-      total: Number(existingOrder.total),
-      status: existingOrder.status,
-      paymentStatus: existingOrder.payment_status,
-      hasAgeRestrictedItems: false,
-      createdAt: existingOrder.created_at,
-      items: (existingItems || []).map((i) => ({
-        name: i.product_name_snapshot,
-        quantity: i.quantity,
-        unitPrice: Number(i.unit_price_snapshot),
-        lineTotal: Number(i.line_total),
-      })),
+    const rpcRes = (rpcRaw || {}) as {
+      status?: string;
+      order_id?: string;
+      notification_id?: string | null;
     };
-  }
 
-  // 2. Extract metadata
-  const metadata = session.metadata || {};
-  const customerName = metadata.customer_name || session.customer_details?.name || "Customer";
-  const customerEmail = metadata.customer_email || session.customer_details?.email || "";
-  const customerPhone = metadata.customer_phone || session.customer_details?.phone || "";
-  const fulfilmentType = (metadata.fulfilment_type as "delivery" | "collection") || "delivery";
-  const deliveryFee = parseFloat(metadata.delivery_fee || "0") || 0;
-  const hasAgeRestrictedItems = metadata.has_age_restricted_items === "true";
-  const profileId = metadata.profile_id || null;
-  const rawAddress = metadata.delivery_address ? JSON.parse(metadata.delivery_address) : null;
+    if (rpcRes.status === "deduplicated" || rpcRes.status === "existing_session") {
+      const existing = await getVerifiedOrder(sessionId);
+      return existing ? { status: "ok", order: existing } : null;
+    }
 
-  // 3. Fetch purchased line items from Stripe
-  const lineItemsList = await stripe.checkout.sessions.listLineItems(sessionId, {
-    limit: 100,
-  });
+    if (rpcRes.status === "created" && rpcRes.order_id) {
+      const createdOrder = await getVerifiedOrder(sessionId);
+      if (!createdOrder) {
+        return null;
+      }
 
-  const orderItemsData: Array<{
-    name: string;
-    quantity: number;
-    unitPrice: number;
-    lineTotal: number;
-  }> = [];
-
-  let subtotal = 0;
-
-  for (const item of lineItemsList.data) {
-    // Skip the delivery charge line item from subtotal calculation
-    if (item.description === "Home Delivery Charge") continue;
-
-    const unitPrice = (item.price?.unit_amount || 0) / 100;
-    const qty = item.quantity || 1;
-    const lineTotal = (item.amount_total || 0) / 100;
-
-    subtotal += lineTotal;
-    orderItemsData.push({
-      name: item.description || "Grocery Item",
-      quantity: qty,
-      unitPrice,
-      lineTotal,
-    });
-  }
-
-  const grandTotal = (session.amount_total || 0) / 100;
-  const orderNumber = `SIR-${Math.floor(100000 + Math.random() * 900000)}`;
-
-  // 4. Insert into orders table
-  const { data: newOrder, error: orderError } = await supabase
-    .from("orders")
-    .insert({
-      order_number: orderNumber,
-      profile_id: profileId,
-      status: "processing",
-      fulfilment_type: fulfilmentType,
-      delivery_address: rawAddress,
-      customer_name: customerName,
-      customer_email: customerEmail,
-      customer_phone: customerPhone,
-      subtotal: Math.round(subtotal * 100) / 100,
-      delivery_charge: deliveryFee,
-      total: grandTotal,
-      stripe_checkout_session_id: sessionId,
-      stripe_payment_intent_id: paymentIntentId,
-      payment_status: "paid",
-    })
-    .select("id")
-    .single();
-
-  if (orderError || !newOrder) {
-    // Handle concurrent duplicate Stripe webhook retry safely (Postgres 23505 unique_violation)
-    if (orderError?.code === "23505") {
-      const { data: racedOrder } = await supabase
+      // Post-commit: clear authenticated user's basket
+      const { data: orderRow } = await supabase
         .from("orders")
-        .select("*")
-        .eq("stripe_checkout_session_id", sessionId)
+        .select("profile_id")
+        .eq("id", rpcRes.order_id)
         .maybeSingle();
 
-      if (racedOrder) {
-        const { data: racedItems } = await supabase
-          .from("order_items")
-          .select("*")
-          .eq("order_id", racedOrder.id);
+      if (orderRow?.profile_id) {
+        try {
+          const { data: userBasket } = await supabase
+            .from("baskets")
+            .select("id")
+            .eq("profile_id", orderRow.profile_id)
+            .maybeSingle();
 
-        return {
-          id: racedOrder.id,
-          orderNumber: racedOrder.order_number,
-          customerName: racedOrder.customer_name,
-          customerEmail: racedOrder.customer_email,
-          customerPhone: racedOrder.customer_phone,
-          fulfilmentType: racedOrder.fulfilment_type as "delivery" | "collection",
-          deliveryAddress: formatDeliveryAddress(racedOrder.delivery_address),
-          subtotal: Number(racedOrder.subtotal),
-          deliveryCharge: Number(racedOrder.delivery_charge),
-          total: Number(racedOrder.total),
-          status: racedOrder.status,
-          paymentStatus: racedOrder.payment_status,
-          hasAgeRestrictedItems: false,
-          createdAt: racedOrder.created_at,
-          items: (racedItems || []).map((i) => ({
-            name: i.product_name_snapshot,
-            quantity: i.quantity,
-            unitPrice: Number(i.unit_price_snapshot),
-            lineTotal: Number(i.line_total),
-          })),
-        };
+          if (userBasket) {
+            await supabase
+              .from("basket_items")
+              .delete()
+              .eq("basket_id", userBasket.id);
+          }
+        } catch {
+          // Non-fatal
+        }
       }
-    }
 
-    console.error("[Orders] Failed to insert order:", orderError);
-    return null;
-  }
+      // Post-commit: dispatch confirmation & owner emails and update queued notification row
+      const emailPayload = {
+        orderNumber: createdOrder.orderNumber,
+        customerName: createdOrder.customerName,
+        customerEmail: createdOrder.customerEmail,
+        fulfilmentType: createdOrder.fulfilmentType,
+        deliveryAddress: createdOrder.deliveryAddress || undefined,
+        items: createdOrder.items,
+        subtotal: createdOrder.subtotal,
+        deliveryCharge: createdOrder.deliveryCharge,
+        total: createdOrder.total,
+        hasAgeRestrictedItems: createdOrder.hasAgeRestrictedItems,
+      };
 
-  // 5. Insert order items & atomically decrement stock
-  for (const item of orderItemsData) {
-    let matchedProd: {
-      id: string;
-      stock_quantity: number;
-      low_stock_threshold?: number;
-    } | null = null;
+      if (rpcRes.notification_id && createdOrder.customerEmail) {
+        try {
+          const customerEmailResult =
+            await sendOrderConfirmationEmail(emailPayload);
+          const resolved = resolveNotificationRecord(customerEmailResult);
 
-    try {
-      const { data: prod } = await supabase
-        .from("products")
-        .select("id, stock_quantity")
-        .ilike("name", item.name)
-        .maybeSingle();
-      matchedProd = prod;
-    } catch {
-      // Non-fatal
-    }
+          const { error: notifUpdateErr } = await supabase
+            .from("order_notifications")
+            .update({
+              send_status: resolved.send_status,
+              attempt_count: 1,
+              last_error: resolved.last_error,
+              sent_at: resolved.sent_at,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", rpcRes.notification_id);
 
-    await supabase.from("order_items").insert({
-      order_id: newOrder.id,
-      product_id: matchedProd?.id || null,
-      product_name_snapshot: item.name,
-      unit_price_snapshot: item.unitPrice,
-      quantity: item.quantity,
-      line_total: item.lineTotal,
-    });
+          if (
+            notifUpdateErr &&
+            resolved.send_status === "not_configured" &&
+            isLegacyNotificationConstraintError(notifUpdateErr)
+          ) {
+            await supabase
+              .from("order_notifications")
+              .update({
+                send_status: "failed",
+                attempt_count: 1,
+                last_error:
+                  resolved.last_error ||
+                  "Email provider not configured — email was not sent.",
+                sent_at: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", rpcRes.notification_id);
+          }
+        } catch (emailErr) {
+          console.error(
+            `[Orders] Customer confirmation email exception for #${createdOrder.orderNumber}:`,
+            emailErr
+          );
+        }
+      }
 
-    if (matchedProd) {
-      const nextStock = Math.max(0, matchedProd.stock_quantity - item.quantity);
       try {
-        await supabase
-          .from("products")
-          .update({ stock_quantity: nextStock })
-          .eq("id", matchedProd.id);
-
-        await recordInventoryAdjustment({
-          productId: matchedProd.id,
-          productName: item.name,
-          previousQuantity: matchedProd.stock_quantity,
-          newQuantity: nextStock,
-          reason: "order_paid",
-          notes: `Deducted via verified Stripe order #${orderNumber}`,
-        });
+        await sendOwnerOrderNotificationEmail(emailPayload);
       } catch {
-        // Non-fatal
+        // Non-fatal post-commit alert
       }
+
+      return { status: "ok", order: createdOrder };
     }
   }
 
-  // 6. Log Age Verification entry if age-restricted
-  if (hasAgeRestrictedItems) {
-    await supabase.from("age_verification_log").insert({
-      order_id: newOrder.id,
-      method:
-        fulfilmentType === "delivery"
-          ? "driver_id_check_on_delivery"
-          : "counter_check_on_collection",
-      result: "pending_physical_check",
-      notes: "Customer confirmed 18+ at checkout. Physical Challenge 25 check required.",
-    });
+  // 2. MISSING DRAFT / LEGACY SESSION: NEVER fall through to name-matching or stock-clamping.
+  const existing = await getVerifiedOrder(sessionId);
+  if (existing) {
+    return { status: "ok", order: existing };
   }
 
-  // 7. Clear the customer's database basket (webhook has no browser cookies)
-  if (profileId) {
-    try {
-      const { data: userBasket } = await supabase
-        .from("baskets")
-        .select("id")
-        .eq("profile_id", profileId)
-        .maybeSingle();
-
-      if (userBasket) {
-        await supabase.from("basket_items").delete().eq("basket_id", userBasket.id);
-      }
-    } catch {
-      // Non-fatal
-    }
-  }
-
-  // 8. Record Verified Paid Order in Admin Activity Feed
+  const paidGbp = ((session.amount_total || 0) / 100).toFixed(2);
   await recordAdminActivity({
-    event_type: "order_paid",
-    severity: "success",
-    title: `Paid Order #${orderNumber} (£${grandTotal.toFixed(2)})`,
-    summary: `Payment confirmed by Stripe webhook • ${fulfilmentType === "delivery" ? "Home Delivery" : "In-Store Collection"
-      } • ${orderItemsData.length} line item(s).`,
-    order_id: newOrder.id,
+    event_type: "order_payment_failed",
+    severity: "error",
+    title: "Paid Stripe session missing checkout draft — manual reconciliation required",
+    summary: `Stripe session (${sessionId.slice(-8)}) settled for £${paidGbp} GBP without a server checkout draft_id. Legacy name-matching order creation is disabled; staff must review and reconcile manually.`,
     metadata: {
-      order_number: orderNumber,
-      total: grandTotal,
-      fulfilment_type: fulfilmentType,
       stripe_session_id: sessionId,
       stripe_payment_intent_id: paymentIntentId,
+      amount_total_pence: session.amount_total ?? null,
+      currency: session.currency || null,
+      requires_manual_reconciliation: true,
     } as Json,
   });
 
-  // 9. Send Customer Order Confirmation & Owner Alert Emails
-  const emailPayload = {
-    orderNumber,
-    customerName,
-    customerEmail,
-    fulfilmentType,
-    deliveryAddress: formatDeliveryAddress(rawAddress) || undefined,
-    items: orderItemsData,
-    subtotal,
-    deliveryCharge: deliveryFee,
-    total: grandTotal,
-    hasAgeRestrictedItems,
-  };
-
-  try {
-    const customerEmailResult = await sendOrderConfirmationEmail(emailPayload);
-    const resolved = resolveNotificationRecord(customerEmailResult);
-
-    if (customerEmail) {
-      const { error: notifErr } = await supabase
-        .from("order_notifications")
-        .insert({
-          order_id: newOrder.id,
-          recipient_email: customerEmail,
-          notification_type: "confirmation",
-          status_target: "processing",
-          send_status: resolved.send_status,
-          attempt_count: 1,
-          last_error: resolved.last_error,
-          sent_at: resolved.sent_at,
-        });
-
-      if (
-        notifErr &&
-        resolved.send_status === "not_configured" &&
-        isLegacyNotificationConstraintError(notifErr)
-      ) {
-        await supabase.from("order_notifications").insert({
-          order_id: newOrder.id,
-          recipient_email: customerEmail,
-          notification_type: "confirmation",
-          status_target: "processing",
-          send_status: "failed",
-          attempt_count: 1,
-          last_error:
-            resolved.last_error ||
-            "Email provider not configured — email was not sent.",
-          sent_at: null,
-        });
-      }
-    }
-  } catch (emailErr) {
-    console.error(`[Orders] Customer confirmation email exception for #${orderNumber}:`, emailErr);
-  }
-
-  try {
-    const ownerEmailResult = await sendOwnerOrderNotificationEmail(emailPayload);
-    if (!ownerEmailResult.success) {
-      console.warn(
-        `[Orders] Owner alert email not sent for #${orderNumber}: ${ownerEmailResult.error || "Unknown error"}`
-      );
-    }
-  } catch (ownerEmailErr) {
-    console.error(`[Orders] Owner alert email exception for #${orderNumber}:`, ownerEmailErr);
-  }
-
-  return {
-    id: newOrder.id,
-    orderNumber,
-    customerName,
-    customerEmail,
-    customerPhone,
-    fulfilmentType,
-    deliveryAddress: formatDeliveryAddress(rawAddress),
-    subtotal,
-    deliveryCharge: deliveryFee,
-    total: grandTotal,
-    status: "processing",
-    paymentStatus: "paid",
-    hasAgeRestrictedItems,
-    createdAt: new Date().toISOString(),
-    items: orderItemsData,
-  };
+  return { status: "reconciliation_required" };
 }
 
 /**
@@ -458,8 +290,6 @@ export async function getVerifiedOrder(sessionId: string): Promise<OrderRecord |
     };
   }
 
-  // Only verified webhooks may create and mark orders as paid.
-  // If the webhook is still in flight, return null so the confirmation page shows a pending state.
   return null;
 }
 
@@ -467,7 +297,8 @@ export async function getVerifiedOrder(sessionId: string): Promise<OrderRecord |
  * Updates an order's refund state when Stripe issues a verified charge.refunded webhook.
  */
 export async function handleStripeChargeRefunded(
-  charge: Stripe.Charge
+  charge: Stripe.Charge,
+  eventId?: string
 ): Promise<void> {
   const paymentIntentId =
     typeof charge.payment_intent === "string"
@@ -476,6 +307,22 @@ export async function handleStripeChargeRefunded(
   if (!paymentIntentId) return;
 
   const supabase = createAdminClient();
+
+  if (eventId) {
+    const { error: rpcErr } = await supabase.rpc(
+      "process_stripe_refund_atomic",
+      {
+        p_event_id: eventId,
+        p_payment_intent_id: paymentIntentId,
+        p_amount_refunded_pence: charge.amount_refunded || 0,
+      }
+    );
+    if (rpcErr) {
+      throw new Error(`Atomic refund processing failed: ${rpcErr.message}`);
+    }
+    return;
+  }
+
   const { data: order } = await supabase
     .from("orders")
     .select("id, order_number, total, payment_status")
@@ -489,7 +336,6 @@ export async function handleStripeChargeRefunded(
     Math.round(((charge.amount_refunded || 0) / 100) * 100) / 100
   );
 
-  // Gracefully update payment_status; set refunded_amount if column exists (migration 004)
   const { error: withRefundColErr } = await supabase
     .from("orders")
     .update({

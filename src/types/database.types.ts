@@ -280,6 +280,7 @@ export type Database = {
           profile_id: string | null;
           status:
             | "pending"
+            | "needs_customer_confirmation"
             | "processing"
             | "ready_for_pickup"
             | "out_for_delivery"
@@ -295,6 +296,8 @@ export type Database = {
           delivery_charge: number;
           total: number;
           refunded_amount?: number;
+          inventory_conflict?: boolean;
+          shortage_details?: Json | null;
           stripe_checkout_session_id: string | null;
           stripe_payment_intent_id: string | null;
           payment_status: "unpaid" | "paid" | "refunded" | "failed";
@@ -309,6 +312,7 @@ export type Database = {
           profile_id?: string | null;
           status?:
             | "pending"
+            | "needs_customer_confirmation"
             | "processing"
             | "ready_for_pickup"
             | "out_for_delivery"
@@ -338,6 +342,7 @@ export type Database = {
           profile_id?: string | null;
           status?:
             | "pending"
+            | "needs_customer_confirmation"
             | "processing"
             | "ready_for_pickup"
             | "out_for_delivery"
@@ -517,6 +522,7 @@ export type Database = {
           previous_status: string | null;
           new_status:
             | "pending"
+            | "needs_customer_confirmation"
             | "processing"
             | "ready_for_pickup"
             | "out_for_delivery"
@@ -534,6 +540,7 @@ export type Database = {
           previous_status?: string | null;
           new_status:
             | "pending"
+            | "needs_customer_confirmation"
             | "processing"
             | "ready_for_pickup"
             | "out_for_delivery"
@@ -777,6 +784,102 @@ export type Database = {
         };
         Relationships: [];
       };
+      checkout_drafts: {
+        Row: {
+          id: string;
+          profile_id: string | null;
+          fulfilment_type: "delivery" | "collection";
+          delivery_address: Json | null;
+          customer_name: string;
+          customer_email: string;
+          customer_phone: string;
+          subtotal: number;
+          delivery_charge: number;
+          total: number;
+          expected_total_pence: number;
+          currency: string;
+          has_age_restricted_items: boolean;
+          age_restriction_acknowledged: boolean;
+          stripe_checkout_session_id: string | null;
+          status: "pending" | "completed" | "expired" | "cancelled";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          profile_id?: string | null;
+          fulfilment_type: "delivery" | "collection";
+          delivery_address?: Json | null;
+          customer_name: string;
+          customer_email: string;
+          customer_phone: string;
+          subtotal: number;
+          delivery_charge?: number;
+          total: number;
+          expected_total_pence: number;
+          currency?: string;
+          has_age_restricted_items?: boolean;
+          age_restriction_acknowledged?: boolean;
+          stripe_checkout_session_id?: string | null;
+          status?: "pending" | "completed" | "expired" | "cancelled";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          profile_id?: string | null;
+          fulfilment_type?: "delivery" | "collection";
+          delivery_address?: Json | null;
+          customer_name?: string;
+          customer_email?: string;
+          customer_phone?: string;
+          subtotal?: number;
+          delivery_charge?: number;
+          total?: number;
+          expected_total_pence?: number;
+          currency?: string;
+          has_age_restricted_items?: boolean;
+          age_restriction_acknowledged?: boolean;
+          stripe_checkout_session_id?: string | null;
+          status?: "pending" | "completed" | "expired" | "cancelled";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      checkout_draft_items: {
+        Row: {
+          id: string;
+          draft_id: string;
+          product_id: string;
+          product_name_snapshot: string;
+          unit_price_snapshot: number;
+          quantity: number;
+          line_total_snapshot: number;
+          is_age_restricted_snapshot: boolean;
+        };
+        Insert: {
+          id?: string;
+          draft_id: string;
+          product_id: string;
+          product_name_snapshot: string;
+          unit_price_snapshot: number;
+          quantity: number;
+          line_total_snapshot: number;
+          is_age_restricted_snapshot?: boolean;
+        };
+        Update: {
+          id?: string;
+          draft_id?: string;
+          product_id?: string;
+          product_name_snapshot?: string;
+          unit_price_snapshot?: number;
+          quantity?: number;
+          line_total_snapshot?: number;
+          is_age_restricted_snapshot?: boolean;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -797,6 +900,41 @@ export type Database = {
           month_paid_revenue: number;
           month_paid_orders: number;
         };
+      };
+      process_paid_order_from_draft: {
+        Args: {
+          p_event_id: string;
+          p_event_type: string;
+          p_draft_id: string;
+          p_stripe_session_id: string;
+          p_payment_intent_id: string | null;
+          p_order_number: string;
+          p_amount_total_pence: number;
+          p_currency: string;
+        };
+        Returns: Json;
+      };
+      process_stripe_refund_atomic: {
+        Args: {
+          p_event_id: string;
+          p_payment_intent_id: string;
+          p_amount_refunded_pence: number;
+        };
+        Returns: Json;
+      };
+      reserve_checkout_draft_stock: {
+        Args: {
+          p_draft_id: string;
+          p_ttl_minutes?: number;
+        };
+        Returns: Json;
+      };
+      release_checkout_draft_reservations: {
+        Args: {
+          p_draft_id: string;
+          p_reason?: string;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

@@ -3,6 +3,12 @@
 import { getBasket } from "@/lib/basket";
 import { calculateDeliveryCharge, type DeliveryCalculationResult } from "@/lib/delivery";
 import { createStripeCheckoutSession } from "@/lib/stripe";
+import {
+  createServerCheckoutDraft,
+  linkStripeSessionToDraft,
+  releaseDraftReservations,
+  reserveDraftStock,
+} from "@/lib/checkout-drafts";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { recordAdminActivity } from "@/lib/activity";
 import {
@@ -49,6 +55,10 @@ export async function createCheckoutSessionAction(
         return null;
       }
     },
+    createCheckoutDraft: createServerCheckoutDraft,
+    reserveDraftStock,
+    releaseDraftReservations,
+    linkStripeSessionToDraft,
     createStripeCheckoutSession,
     recordCheckoutInitiatedActivity: async ({
       stripeSessionId,

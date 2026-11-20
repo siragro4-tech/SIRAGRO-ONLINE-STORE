@@ -8,6 +8,7 @@ import {
   createOrderFromStripeSession,
   handleStripeChargeRefunded,
 } from "@/lib/orders";
+import { releaseDraftReservations } from "@/lib/checkout-drafts";
 import { recordAdminActivity } from "@/lib/activity";
 import type { Json } from "@/types/database.types";
 
@@ -82,8 +83,12 @@ export async function POST(req: Request) {
       // Only create/mark order as paid if Stripe confirms payment_status === "paid"
       if (session.payment_status === "paid") {
         try {
-          const order = await createOrderFromStripeSession(session);
-          if (!order) {
+          const result = await createOrderFromStripeSession(
+            session,
+            event.id,
+            event.type
+          );
+          if (!result) {
             console.error("[Stripe Webhook] Order creation returned null.");
             return new NextResponse("Failed to persist order", { status: 500 });
           }
@@ -125,10 +130,19 @@ export async function POST(req: Request) {
       break;
     }
 
+    case "checkout.session.expired": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const draftId = session.metadata?.draft_id?.trim();
+      if (draftId) {
+        await releaseDraftReservations(draftId, "expired");
+      }
+      break;
+    }
+
     case "charge.refunded": {
       const charge = event.data.object as Stripe.Charge;
       try {
-        await handleStripeChargeRefunded(charge);
+        await handleStripeChargeRefunded(charge, event.id);
       } catch (refundErr) {
         console.error("[Stripe Webhook] Failed to record refund:", refundErr);
         return new NextResponse("Failed to process refund", { status: 500 });

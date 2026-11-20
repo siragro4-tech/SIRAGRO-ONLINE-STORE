@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import type { BasketSummary } from "@/lib/basket";
+import type { StockShortageItem } from "@/lib/checkout-draft-rules";
 import type {
   DeliveryCalculationResult,
   FulfilmentAvailability,
@@ -38,7 +40,9 @@ export function CheckoutForm({
   const [isCheckingPostcode, startPostcodeCheck] = useTransition();
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [shortages, setShortages] = useState<StockShortageItem[]>([]);
   const [isSubmitting, startSubmission] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const currentDeliveryFee =
     fulfilmentType === "delivery" ? deliveryResult?.deliveryFee || 0.0 : 0.0;
@@ -57,8 +61,7 @@ export function CheckoutForm({
     });
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function submitCheckout(acceptAvailable: boolean) {
     setErrorMessage(null);
 
     if (!fulfilmentType) {
@@ -68,23 +71,74 @@ export function CheckoutForm({
       return;
     }
 
-    const formData = new FormData(e.currentTarget);
+    if (!formRef.current) return;
+    const formData = new FormData(formRef.current);
     formData.set("fulfilmentType", fulfilmentType);
+    if (acceptAvailable) {
+      formData.set("acceptAvailableQuantities", "true");
+    }
 
     startSubmission(async () => {
       const result = await createCheckoutSessionAction(null, formData);
-      if (result.error) {
+      if (result.shortages && result.shortages.length > 0) {
+        setShortages(result.shortages);
+        setErrorMessage(result.error || "Some items have limited stock.");
+      } else if (result.error) {
+        setShortages([]);
         setErrorMessage(result.error);
       } else if (result.url) {
-        // Redirect to Stripe's hosted checkout page
+        setShortages([]);
         window.location.href = result.url;
       }
     });
   }
 
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    submitCheckout(false);
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="mt-8 space-y-8">
-      {errorMessage && (
+    <form ref={formRef} onSubmit={handleSubmit} className="mt-8 space-y-8">
+      {shortages.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 text-sm text-amber-950 space-y-3"
+        >
+          <p className="font-bold text-base">Stock Shortage — Action Required</p>
+          <p className="text-xs leading-relaxed">
+            Some items in your basket do not have enough stock available. We will never reduce quantities without your permission.
+          </p>
+          <ul className="divide-y divide-amber-200 rounded-lg border border-amber-200 bg-white text-xs">
+            {shortages.map((s) => (
+              <li key={s.productId} className="flex items-center justify-between px-3 py-2 gap-3">
+                <span className="font-semibold text-slate-900">{s.productName}</span>
+                <span className="shrink-0 font-mono text-amber-900">
+                  Requested: {s.requestedQuantity} • Available: {s.availableQuantity}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-3 pt-1">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => submitCheckout(true)}
+              className="rounded-lg bg-[#323C4B] px-4 py-2 text-xs font-bold text-white hover:bg-[#242c37] disabled:opacity-50"
+            >
+              {isSubmitting ? "Updating & reserving..." : "Accept Available Quantities & Continue"}
+            </button>
+            <Link
+              href="/basket"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-[#323C4B] hover:bg-slate-50"
+            >
+              Edit Basket
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {errorMessage && shortages.length === 0 && (
         <div
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"

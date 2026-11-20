@@ -7,6 +7,7 @@ export type SalesPeriod = "today" | "7d" | "month" | "all";
 
 export type OrderStatusValue =
   | "pending"
+  | "needs_customer_confirmation"
   | "processing"
   | "ready_for_pickup"
   | "out_for_delivery"
@@ -30,6 +31,7 @@ export const ORDER_ALLOWED_TRANSITIONS: Record<
 > = {
   delivery: {
     pending: ["processing", "cancelled"],
+    needs_customer_confirmation: ["cancelled"],
     processing: ["out_for_delivery", "cancelled"],
     ready_for_pickup: [],
     out_for_delivery: ["delivered", "processing"],
@@ -39,6 +41,7 @@ export const ORDER_ALLOWED_TRANSITIONS: Record<
   },
   collection: {
     pending: ["processing", "cancelled"],
+    needs_customer_confirmation: ["cancelled"],
     processing: ["ready_for_pickup", "cancelled"],
     ready_for_pickup: ["collected", "processing", "cancelled"],
     out_for_delivery: [],

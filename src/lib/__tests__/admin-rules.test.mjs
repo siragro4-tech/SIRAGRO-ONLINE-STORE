@@ -39,6 +39,14 @@ import {
 } from "../email-status.ts";
 import { validatePaidGbpStripeSession } from "../stripe-rules.ts";
 import {
+  validateDraftItems,
+  buildDraftTotals,
+  buildStripeSessionIdempotencyKey,
+  validateStripeSessionAgainstDraft,
+  detectStockShortages,
+  applyAcceptedAvailableQuantities,
+} from "../checkout-draft-rules.ts";
+import {
   createAdminSessionToken,
   verifyAdminSessionToken,
   ADMIN_SESSION_COOKIE_NAME,
@@ -392,6 +400,30 @@ describe("Delivery Safety Rules (Fail Closed)", () => {
           settingsError,
         }),
       getProfileId: async () => null,
+      createCheckoutDraft: async ({ deliveryFee }) => ({
+        ok: true,
+        draftId: "draft-1111-2222",
+        items: [
+          {
+            productId: "11111111-1111-4111-8111-111111111111",
+            productNameSnapshot: "Whole Milk 2L",
+            unitPriceSnapshot: 7.5,
+            quantity: 2,
+            lineTotalSnapshot: 15.0,
+            isAgeRestrictedSnapshot: false,
+          },
+        ],
+        hasAgeRestrictedItems: false,
+        totals: {
+          subtotal: 15.0,
+          deliveryCharge: deliveryFee,
+          total: 15.0 + deliveryFee,
+          expectedTotalPence: Math.round((15.0 + deliveryFee) * 100),
+        },
+      }),
+      reserveDraftStock: async () => ({ ok: true }),
+      releaseDraftReservations: async () => {},
+      linkStripeSessionToDraft: async () => ({ ok: true }),
       createStripeCheckoutSession: async (params) => {
         stripeCallCount += 1;
         lastStripeParams = params;
@@ -418,6 +450,23 @@ describe("Delivery Safety Rules (Fail Closed)", () => {
     assert.equal(collectionRes.url, "https://checkout.stripe.test/session");
     assert.equal(stripeCallCount, 1);
     assert.equal(lastStripeParams.deliveryFee, 0);
+    assert.equal(lastStripeParams.draftId, "draft-1111-2222");
+    assert.equal(
+      lastStripeParams.idempotencyKey,
+      "siragro-checkout-draft-draft-1111-2222"
+    );
+
+    // Fail-closed if draft creation fails (e.g. migration 007 pending or stock changed): 0 Stripe sessions
+    const callsBeforeDraftFail = stripeCallCount;
+    const draftFailRes = await processCheckoutSubmission(buildForm("collection"), {
+      ...makeDeps(unconfirmedSettings),
+      createCheckoutDraft: async () => ({
+        ok: false,
+        error: "Checkout draft tables pending migration.",
+      }),
+    });
+    assert.ok(draftFailRes.error);
+    assert.equal(stripeCallCount, callsBeforeDraftFail);
 
     // 2. Collection disabled: collection blocked via server action and 0 Stripe sessions created
     const callsBeforeDisabledCollection = stripeCallCount;
@@ -669,5 +718,158 @@ describe("Email Notification Status & Stripe Currency Checks", () => {
     assert.equal(isStripeSecretConfigured("sk_test_51ExampleKey"), true);
     assert.equal(isStripeWebhookConfigured("whsec_your-stripe-webhook-secret"), false);
     assert.equal(isStripeWebhookConfigured("whsec_ExampleSecret"), true);
+  });
+});
+
+describe("Server Checkout Draft Validation & Stripe Amount Matching", () => {
+  const prodUuid = "11111111-1111-4111-8111-111111111111";
+
+  it("validates draft items by UUID, availability, stock, and quantity bounds", () => {
+    const valid = validateDraftItems([
+      {
+        productId: prodUuid,
+        name: "Whole Milk 2L",
+        unitPrice: 1.65,
+        quantity: 2,
+        isAvailable: true,
+        stockQuantity: 10,
+        isAgeRestricted: false,
+      },
+    ]);
+    assert.equal(valid.ok, true);
+    if (valid.ok) {
+      assert.equal(valid.items[0].lineTotalSnapshot, 3.3);
+    }
+
+    const badId = validateDraftItems([
+      {
+        productId: "not-a-uuid",
+        name: "Whole Milk 2L",
+        unitPrice: 1.65,
+        quantity: 1,
+        isAvailable: true,
+        stockQuantity: 10,
+        isAgeRestricted: false,
+      },
+    ]);
+    assert.equal(badId.ok, false);
+
+    const outOfStock = validateDraftItems([
+      {
+        productId: prodUuid,
+        name: "Whole Milk 2L",
+        unitPrice: 1.65,
+        quantity: 5,
+        isAvailable: true,
+        stockQuantity: 2,
+        isAgeRestricted: false,
+      },
+    ]);
+    assert.equal(outOfStock.ok, false);
+  });
+
+  it("computes server totals in GBP pence and verifies exact Stripe session match", () => {
+    const valid = validateDraftItems([
+      {
+        productId: prodUuid,
+        name: "Whole Milk 2L",
+        unitPrice: 1.65,
+        quantity: 2,
+        isAvailable: true,
+        stockQuantity: 10,
+        isAgeRestricted: false,
+      },
+    ]);
+    assert.equal(valid.ok, true);
+    if (!valid.ok) return;
+
+    const totals = buildDraftTotals(valid.items, 2.5);
+    assert.equal(totals.subtotal, 3.3);
+    assert.equal(totals.deliveryCharge, 2.5);
+    assert.equal(totals.total, 5.8);
+    assert.equal(totals.expectedTotalPence, 580);
+
+    assert.equal(
+      buildStripeSessionIdempotencyKey("draft-abc"),
+      "siragro-checkout-draft-draft-abc"
+    );
+
+    assert.equal(
+      validateStripeSessionAgainstDraft({
+        paymentStatus: "paid",
+        currency: "gbp",
+        amountTotalPence: 580,
+        expectedTotalPence: 580,
+      }).valid,
+      true
+    );
+
+    assert.equal(
+      validateStripeSessionAgainstDraft({
+        paymentStatus: "paid",
+        currency: "gbp",
+        amountTotalPence: 500,
+        expectedTotalPence: 580,
+      }).valid,
+      false
+    );
+
+    assert.equal(
+      validateStripeSessionAgainstDraft({
+        paymentStatus: "paid",
+        currency: "usd",
+        amountTotalPence: 580,
+        expectedTotalPence: 580,
+      }).valid,
+      false
+    );
+  });
+
+  it("enforces explicit customer acceptance on stock shortages and holds unconfirmed orders", () => {
+    const items = [
+      {
+        productId: prodUuid,
+        name: "Whole Milk 2L",
+        unitPrice: 1.65,
+        quantity: 5,
+        isAvailable: true,
+        stockQuantity: 2,
+        isAgeRestricted: false,
+      },
+    ];
+
+    const shortages = detectStockShortages(items);
+    assert.equal(shortages.length, 1);
+    assert.equal(shortages[0].requestedQuantity, 5);
+    assert.equal(shortages[0].availableQuantity, 2);
+
+    // Without explicit acceptance, checkout must be blocked
+    const rejected = applyAcceptedAvailableQuantities(items, false);
+    assert.equal(rejected.ok, false);
+
+    // With explicit acceptance, quantity adjusts strictly to available stock
+    const accepted = applyAcceptedAvailableQuantities(items, true);
+    assert.equal(accepted.ok, true);
+    if (accepted.ok) {
+      assert.equal(accepted.items[0].quantity, 2);
+    }
+
+    // Order placed on hold at needs_customer_confirmation cannot be approved/dispatched
+    assert.equal(
+      isValidOrderTransition("collection", "needs_customer_confirmation", "processing"),
+      false
+    );
+    assert.equal(
+      isValidOrderTransition("collection", "needs_customer_confirmation", "ready_for_pickup"),
+      false
+    );
+    assert.equal(
+      isValidOrderTransition("delivery", "needs_customer_confirmation", "out_for_delivery"),
+      false
+    );
+    assert.equal(
+      isValidOrderTransition("collection", "needs_customer_confirmation", "cancelled"),
+      true
+    );
   });
 });

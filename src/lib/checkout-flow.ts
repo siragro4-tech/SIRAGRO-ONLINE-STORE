@@ -1,12 +1,23 @@
 import type { DeliveryCalculationResult } from "./delivery-rules";
+import type {
+  DraftTotals,
+  StockShortageItem,
+  ValidatedDraftItem,
+} from "./checkout-draft-rules";
 
 export type CheckoutActionResult = {
   error?: string;
   url?: string;
   devBypass?: boolean;
+  shortages?: StockShortageItem[];
 };
 
-export interface CheckoutBasketSummary<TItem = unknown> {
+export interface CheckoutBasketItemLike {
+  productId: string;
+  quantity: number;
+}
+
+export interface CheckoutBasketSummary<TItem = CheckoutBasketItemLike> {
   items: TItem[];
   itemCount: number;
   subtotal: number;
@@ -14,7 +25,20 @@ export interface CheckoutBasketSummary<TItem = unknown> {
   error?: string;
 }
 
-export interface CheckoutFlowDeps<TItem = unknown> {
+export interface StripeCheckoutLineItemInput {
+  productId: string;
+  quantity: number;
+  product: {
+    name: string;
+    price: number;
+    unit?: string | null;
+    brand?: string | null;
+  };
+}
+
+export interface CheckoutFlowDeps<
+  TItem extends CheckoutBasketItemLike = CheckoutBasketItemLike,
+> {
   getBasket: () => Promise<CheckoutBasketSummary<TItem>>;
   calculateDeliveryCharge: (options: {
     fulfilmentType: "delivery" | "collection";
@@ -22,8 +46,52 @@ export interface CheckoutFlowDeps<TItem = unknown> {
     subtotal: number;
   }) => Promise<DeliveryCalculationResult>;
   getProfileId: () => Promise<string | null>;
+  createCheckoutDraft: (params: {
+    profileId?: string | null;
+    fulfilmentType: "delivery" | "collection";
+    deliveryAddress?: {
+      line1: string;
+      line2?: string;
+      city: string;
+      postcode: string;
+    };
+    customerName: string;
+    customerEmail: string;
+    customerPhone: string;
+    deliveryFee: number;
+    ageRestrictionAcknowledged?: boolean;
+    acceptAvailableQuantities?: boolean;
+    items: Array<{ productId: string; quantity: number }>;
+  }) => Promise<
+    | {
+        ok: true;
+        draftId: string;
+        totals: DraftTotals;
+        items: ValidatedDraftItem[];
+        hasAgeRestrictedItems: boolean;
+      }
+    | {
+        ok: false;
+        error: string;
+        shortages?: StockShortageItem[];
+      }
+  >;
+  reserveDraftStock: (
+    draftId: string
+  ) => Promise<
+    | { ok: true }
+    | { ok: false; error: string; shortages?: StockShortageItem[] }
+  >;
+  releaseDraftReservations: (
+    draftId: string,
+    reason?: "released" | "expired"
+  ) => Promise<void>;
+  linkStripeSessionToDraft: (
+    draftId: string,
+    stripeSessionId: string
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   createStripeCheckoutSession: (params: {
-    items: TItem[];
+    items: StripeCheckoutLineItemInput[];
     fulfilmentType: "delivery" | "collection";
     deliveryFee: number;
     customerName: string;
@@ -37,6 +105,8 @@ export interface CheckoutFlowDeps<TItem = unknown> {
     };
     hasAgeRestrictedItems: boolean;
     profileId?: string | null;
+    draftId: string;
+    idempotencyKey: string;
   }) => Promise<{ id: string; url: string | null }>;
   recordCheckoutInitiatedActivity?: (params: {
     stripeSessionId: string;
@@ -48,10 +118,12 @@ export interface CheckoutFlowDeps<TItem = unknown> {
 
 /**
  * Pure server-side checkout orchestration.
- * Always computes basket subtotal, delivery eligibility, and fulfilment fee
- * from trusted server state, ignoring any browser-submitted fees or totals.
+ * Validates stock, requires explicit customer acceptance on shortages,
+ * reserves stock atomically, and creates the Stripe session strictly from the draft.
  */
-export async function processCheckoutSubmission<TItem>(
+export async function processCheckoutSubmission<
+  TItem extends CheckoutBasketItemLike,
+>(
   formData: FormData,
   deps: CheckoutFlowDeps<TItem>
 ): Promise<CheckoutActionResult> {
@@ -65,13 +137,14 @@ export async function processCheckoutSubmission<TItem>(
     return { error: "Your basket is empty. Please add items before checkout." };
   }
 
-  // 1. Extract contact details (never read fee/subtotal/total from formData)
   const customerName = formData.get("customerName")?.toString().trim();
   const customerEmail = formData.get("customerEmail")?.toString().trim();
   const customerPhone = formData.get("customerPhone")?.toString().trim();
   const fulfilmentType = formData.get("fulfilmentType")?.toString() as
     | "delivery"
     | "collection";
+  const acceptAvailableQuantities =
+    formData.get("acceptAvailableQuantities")?.toString() === "true";
 
   if (!customerName || !customerEmail || !customerPhone) {
     return {
@@ -85,7 +158,6 @@ export async function processCheckoutSubmission<TItem>(
     };
   }
 
-  // 2. Server-side fulfilment eligibility & charge calculation
   let deliveryFee = 0;
   let deliveryAddress:
     | { line1: string; line2?: string; city: string; postcode: string }
@@ -145,52 +217,105 @@ export async function processCheckoutSubmission<TItem>(
     deliveryFee = collectionCheck.deliveryFee;
   }
 
-  // 3. Challenge 25 Age Restriction Check
-  if (summary.hasAgeRestrictedItems) {
-    const ageConfirmed = formData.get("ageConfirmed");
-    if (!ageConfirmed || ageConfirmed !== "true") {
-      return {
-        error:
-          "Your order contains age-restricted items (18+). You must confirm you are 18 or older and agree to present photographic ID upon delivery/collection.",
-      };
-    }
+  const ageConfirmed = formData.get("ageConfirmed")?.toString() === "true";
+  if (summary.hasAgeRestrictedItems && !ageConfirmed) {
+    return {
+      error:
+        "Your order contains age-restricted items (18+). You must confirm you are 18 or older and agree to present photographic ID upon delivery/collection.",
+    };
   }
 
-  // 4. Resolve optional authenticated user profile ID
   const profileId = await deps.getProfileId();
 
-  // 5. Create Stripe Checkout Session with server-calculated totals
+  // 1. Create & persist immutable server checkout draft (checks stock + explicit shortage acceptance)
+  const draftResult = await deps.createCheckoutDraft({
+    profileId,
+    fulfilmentType,
+    deliveryAddress,
+    customerName,
+    customerEmail,
+    customerPhone,
+    deliveryFee,
+    ageRestrictionAcknowledged: ageConfirmed,
+    acceptAvailableQuantities,
+    items: summary.items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    })),
+  });
+
+  if (!draftResult.ok) {
+    return {
+      error: draftResult.error,
+      shortages: draftResult.shortages,
+    };
+  }
+
+  // 2. Atomically reserve stock with expiry before creating Stripe session
+  const reservationRes = await deps.reserveDraftStock(draftResult.draftId);
+  if (!reservationRes.ok) {
+    return {
+      error: reservationRes.error,
+      shortages: reservationRes.shortages,
+    };
+  }
+
+  // 3. Create Stripe Checkout Session strictly from draftResult.items (never stale basket prices)
   try {
+    const idempotencyKey = `siragro-checkout-draft-${draftResult.draftId}`;
+    const stripeItems: StripeCheckoutLineItemInput[] = draftResult.items.map(
+      (item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        product: {
+          name: item.productNameSnapshot,
+          price: item.unitPriceSnapshot,
+        },
+      })
+    );
+
     const session = await deps.createStripeCheckoutSession({
-      items: summary.items,
+      items: stripeItems,
       fulfilmentType,
-      deliveryFee,
+      deliveryFee: draftResult.totals.deliveryCharge,
       customerName,
       customerEmail,
       customerPhone,
       deliveryAddress,
-      hasAgeRestrictedItems: summary.hasAgeRestrictedItems,
+      hasAgeRestrictedItems: draftResult.hasAgeRestrictedItems,
       profileId,
+      draftId: draftResult.draftId,
+      idempotencyKey,
     });
 
     if (!session.url) {
+      await deps.releaseDraftReservations(draftResult.draftId, "released");
       return {
         error: "Could not initialize payment session. Please try again.",
       };
     }
 
-    const expectedTotal = Math.round((summary.subtotal + deliveryFee) * 100) / 100;
+    const linkRes = await deps.linkStripeSessionToDraft(
+      draftResult.draftId,
+      session.id
+    );
+    if (!linkRes.ok) {
+      await deps.releaseDraftReservations(draftResult.draftId, "released");
+      return { error: linkRes.error };
+    }
+
     if (deps.recordCheckoutInitiatedActivity) {
       await deps.recordCheckoutInitiatedActivity({
         stripeSessionId: session.id,
         fulfilmentType,
-        expectedTotal,
-        itemCount: summary.itemCount,
+        expectedTotal: draftResult.totals.total,
+        itemCount: draftResult.items.reduce((sum, i) => sum + i.quantity, 0),
       });
     }
 
     return { url: session.url };
   } catch (err: unknown) {
+    await deps.releaseDraftReservations(draftResult.draftId, "released");
     const message = err instanceof Error ? err.message : "Unknown error";
     if (message.includes("STRIPE_SECRET_KEY")) {
       return {
