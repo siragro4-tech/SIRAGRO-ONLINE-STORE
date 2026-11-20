@@ -98,3 +98,10 @@ flutter pub get
 dart run flutter_launcher_icons
 dart run flutter_native_splash:create
 ```
+
+### Setting the Installed App Display Name to `SIRAGRO`
+
+Keep the Dart package name (`siragro_mobile`) and bundle/application identifiers unchanged. Once `android/` and `ios/` are generated:
+- **Android (`apps/mobile/android/app/src/main/AndroidManifest.xml`):** set `android:label="SIRAGRO"`.
+- **iOS (`apps/mobile/ios/Runner/Info.plist`):** set `CFBundleDisplayName` and `CFBundleName` to `SIRAGRO`.
+*(Note: The operating system controls the launcher label font weight beneath the app icon; bold `SIRAGRO` typography is rendered inside the Flutter intro and in-app headings.)*

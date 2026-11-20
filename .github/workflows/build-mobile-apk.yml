@@ -40,22 +40,42 @@ jobs:
             rm -rf temp_mobile_shell
           fi
 
+      - name: Set installed app display name to SIRAGRO
+        run: |
+          sed -i 's/android:label="[^"]*"/android:label="SIRAGRO"/' apps/mobile/android/app/src/main/AndroidManifest.xml
+          grep -q 'android:label="SIRAGRO"' apps/mobile/android/app/src/main/AndroidManifest.xml
+          python3 -c '
+          import plistlib
+          p = "apps/mobile/ios/Runner/Info.plist"
+          with open(p, "rb") as f:
+              data = plistlib.load(f)
+          data["CFBundleDisplayName"] = "SIRAGRO"
+          data["CFBundleName"] = "SIRAGRO"
+          with open(p, "wb") as f:
+              plistlib.dump(data, f)
+          '
+
       - name: Install Flutter dependencies
         working-directory: apps/mobile
         run: flutter pub get
 
-      - name: Generate SIRAGRO Android launcher icons
+      - name: Generate SIRAGRO launcher icons (Android & iOS)
         working-directory: apps/mobile
         run: dart run flutter_launcher_icons
 
-      - name: Generate SIRAGRO Android launch splash screen
+      - name: Generate SIRAGRO native launch splash (Android & iOS)
         working-directory: apps/mobile
         run: dart run flutter_native_splash:create
 
-      - name: Verify generated Android icon & splash resources
+      - name: Verify generated icon & splash resources
         run: |
           test -f apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           test -f apps/mobile/android/app/src/main/res/drawable/launch_background.xml
+          test -f apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
+
+      - name: Format Dart code
+        working-directory: apps/mobile
+        run: dart format .
 
       - name: Analyze Flutter code
         working-directory: apps/mobile
@@ -65,23 +85,12 @@ jobs:
         working-directory: apps/mobile
         run: flutter test
 
-      - name: Build Debug APK
+      - name: Build offline Debug Design Preview APK
         working-directory: apps/mobile
-        env:
-          SIRAGRO_API_BASE_URL: ${{ vars.SIRAGRO_STAGING_API_URL }}
-          SIRAGRO_SUPABASE_URL: ${{ vars.SIRAGRO_STAGING_SUPABASE_URL }}
-          SIRAGRO_SUPABASE_ANON_KEY: ${{ vars.SIRAGRO_STAGING_SUPABASE_ANON_KEY }}
         run: |
-          DESIGN_PREVIEW="false"
-          if [ -z "${SIRAGRO_API_BASE_URL}" ]; then
-            DESIGN_PREVIEW="true"
-          fi
           flutter build apk --debug \
-            --dart-define=SIRAGRO_ENV=staging \
-            --dart-define=SIRAGRO_DESIGN_PREVIEW="${DESIGN_PREVIEW}" \
-            --dart-define=SIRAGRO_API_BASE_URL="${SIRAGRO_API_BASE_URL}" \
-            --dart-define=SIRAGRO_SUPABASE_URL="${SIRAGRO_SUPABASE_URL}" \
-            --dart-define=SIRAGRO_SUPABASE_ANON_KEY="${SIRAGRO_SUPABASE_ANON_KEY}"
+            --dart-define=SIRAGRO_ENV=preview \
+            --dart-define=SIRAGRO_DESIGN_PREVIEW=true
 
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4

@@ -1,8 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../app/theme/siragro_theme.dart';
+import '../../core/providers/app_providers.dart';
 import '../auth/auth_controller.dart';
+
+class _CustomerAccountDetails {
+  final String? fullName;
+  final String? phone;
+  final List<Map<String, dynamic>> addresses;
+
+  const _CustomerAccountDetails({
+    this.fullName,
+    this.phone,
+    this.addresses = const [],
+  });
+}
+
+final customerAccountDetailsProvider =
+    FutureProvider.autoDispose<_CustomerAccountDetails>((ref) async {
+  final auth = ref.watch(authControllerProvider);
+  final config = ref.watch(appConfigProvider);
+  if (!auth.isAuthenticated ||
+      !config.isSupabaseConfigured ||
+      config.isDesignPreview ||
+      auth.user == null) {
+    return const _CustomerAccountDetails();
+  }
+
+  final client = Supabase.instance.client;
+  final userId = auth.user!.id;
+
+  final profileFuture = client
+      .from('profiles')
+      .select('first_name, last_name, phone')
+      .eq('id', userId)
+      .maybeSingle();
+  final addressesFuture = client
+      .from('addresses')
+      .select('id, label, address_line_1, city, postcode, is_default')
+      .eq('profile_id', userId)
+      .order('is_default', ascending: false);
+
+  final results = await Future.wait([profileFuture, addressesFuture]);
+  final profile = results[0] as Map<String, dynamic>?;
+  final addresses = (results[1] as List<dynamic>? ?? const [])
+      .whereType<Map<String, dynamic>>()
+      .toList();
+
+  final first = (profile?['first_name'] as String?)?.trim() ?? '';
+  final last = (profile?['last_name'] as String?)?.trim() ?? '';
+  final fullName = [first, last].where((s) => s.isNotEmpty).join(' ');
+
+  return _CustomerAccountDetails(
+    fullName: fullName.isEmpty ? null : fullName,
+    phone: (profile?['phone'] as String?)?.trim(),
+    addresses: addresses,
+  );
+});
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -10,6 +66,7 @@ class AccountScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
+    final detailsAsync = ref.watch(customerAccountDetailsProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
@@ -35,12 +92,31 @@ class AccountScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
+                      if (detailsAsync.valueOrNull?.fullName != null) ...[
+                        Text(
+                          detailsAsync.valueOrNull!.fullName!,
+                          style: textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                      ],
                       Text(
                         auth.user?.email ?? '',
-                        style: textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                       ),
+                      if (detailsAsync.valueOrNull?.phone != null &&
+                          detailsAsync.valueOrNull!.phone!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          detailsAsync.valueOrNull!.phone!,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: SiragroSpacing.md),
                       Row(
                         children: [
@@ -91,7 +167,7 @@ class AccountScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Sign in or create an account to view your order history and sync your basket.',
+                        'Sign in or create an account to view your order history, saved addresses, and sync your basket.',
                         style: textTheme.bodyMedium?.copyWith(
                           color: Colors.white.withValues(alpha: 0.86),
                         ),
@@ -127,6 +203,42 @@ class AccountScreen extends ConsumerWidget {
                     ],
                   ),
           ),
+          if (auth.isAuthenticated &&
+              (detailsAsync.valueOrNull?.addresses.isNotEmpty ?? false)) ...[
+            const SizedBox(height: SiragroSpacing.lg),
+            Text(
+              'Saved Delivery Addresses',
+              style: textTheme.labelLarge?.copyWith(
+                color: SiragroColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: SiragroSpacing.sm),
+            Card(
+              child: Column(
+                children: detailsAsync.valueOrNull!.addresses.map((addr) {
+                  final label = (addr['label'] as String?)?.trim();
+                  final line1 = (addr['address_line_1'] as String?) ?? '';
+                  final city = (addr['city'] as String?) ?? '';
+                  final postcode = (addr['postcode'] as String?) ?? '';
+                  final isDefault = addr['is_default'] == true;
+                  return ListTile(
+                    leading: const Icon(
+                      Icons.location_on_outlined,
+                      color: SiragroColors.brand,
+                    ),
+                    title: Text(
+                      label?.isNotEmpty == true ? label! : line1,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text('$line1, $city $postcode'.trim()),
+                    trailing: isDefault
+                        ? const Chip(label: Text('Default'))
+                        : null,
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
           const SizedBox(height: SiragroSpacing.lg),
           Text(
             'Store & Customer Care',

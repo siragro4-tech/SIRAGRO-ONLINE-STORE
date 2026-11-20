@@ -140,6 +140,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onRefresh: () async => ref.invalidate(homeDataProvider),
         child: CustomScrollView(
           slivers: [
+            // Store utility strip (matches website Header top bar)
+            SliverToBoxAdapter(
+              child: Container(
+                color: SiragroColors.brandDark,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: const Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 14, color: Colors.white70),
+                    SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '147 North Hyde Rd, Hayes UB3 4NS • Daily 7am–10pm • Challenge 25',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFFE2E8F0),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
             // Editorial search entry bar
             SliverToBoxAdapter(
               child: Padding(
@@ -332,6 +358,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         );
                       },
                     ),
+                  if (data.featuredProducts.isNotEmpty) ...[
+                    // In-Store Counter Services (matches website section 4)
+                    _InStoreServicesSection(),
+                    // Local Delivery Coverage (matches website section 5)
+                    _DeliveryCoverageSection(
+                      onViewDetails: () => context.push('/support/delivery'),
+                    ),
+                  ],
                 ]),
               ),
             ),
@@ -361,20 +395,20 @@ class _StoreHeroCarousel extends StatelessWidget {
   Widget build(BuildContext context) {
     final slides = [
       _HeroSlide(
-        eyebrow: 'NEIGHBOURHOOD GROCERY • UB3 4NS',
-        title: 'Fresh Choices, Everyday Essentials',
+        eyebrow: 'SIRAGRO SUPERMARKET & OFF-LICENCE',
+        title: 'Fresh Choices.\nEveryday Essentials.',
         subtitle:
-            'Produce, pantry staples, chilled drinks & licensed off-licence.',
-        buttonLabel: 'Browse Groceries',
+            'Your local supermarket for fresh groceries, everyday essentials and more.',
+        buttonLabel: 'Shop Now',
         onPressed: onBrowseShop,
         usePhoto: true,
       ),
       _HeroSlide(
-        eyebrow: 'CLICK & COLLECT • HAYES',
+        eyebrow: 'CLICK & COLLECT • HAYES UB3 4NS',
         title: '147 North Hyde Road',
         subtitle:
-            'Check live collection & local delivery availability before checkout.',
-        buttonLabel: 'Fulfilment Info',
+            'Free in-store collection in 30 mins. Check live delivery availability before checkout.',
+        buttonLabel: 'Delivery & Collection',
         onPressed: onDeliveryInfo,
         usePhoto: false,
       ),
@@ -388,7 +422,7 @@ class _StoreHeroCarousel extends StatelessWidget {
     return Column(
       children: [
         SizedBox(
-          height: 192,
+          height: 212,
           child: PageView.builder(
             controller: controller,
             itemCount: slides.length,
@@ -475,15 +509,26 @@ class _HeroSlide extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (usePhoto)
-            Opacity(
-              opacity: 0.24,
-              child: Image.asset(
-                'assets/images/hero-supermarket.jpg',
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          if (usePhoto) ...[
+            Image.asset(
+              'assets/images/hero-supermarket.jpg',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    SiragroColors.brandDark.withValues(alpha: 0.88),
+                    SiragroColors.brand.withValues(alpha: 0.68),
+                    SiragroColors.brand.withValues(alpha: 0.35),
+                  ],
+                ),
               ),
             ),
+          ],
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -504,13 +549,14 @@ class _HeroSlide extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.3,
+                    height: 1.15,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -542,6 +588,197 @@ class _HeroSlide extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _InStoreServicesSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    const services = [
+      (icon: Icons.payments_outlined, name: 'PayPoint', desc: 'Bills & energy'),
+      (icon: Icons.confirmation_num_outlined, name: 'National Lottery', desc: 'Tickets & scratch'),
+      (icon: Icons.currency_exchange_rounded, name: 'Ria Money', desc: 'Global transfer'),
+      (icon: Icons.key_outlined, name: 'KeyNest', desc: 'Key exchange'),
+      (icon: Icons.phone_android_outlined, name: 'Phone Repair', desc: 'Screen fix'),
+      (icon: Icons.wine_bar_outlined, name: 'Off Licence', desc: 'Beers & spirits'),
+    ];
+
+    return Container(
+      color: SiragroColors.brand,
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 26),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'In-Store Services',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Convenient counter services at 147 North Hyde Road, Hayes',
+            style: TextStyle(color: Color(0xFFDCE3EC), fontSize: 12.5),
+          ),
+          const SizedBox(height: 14),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 1.05,
+            ),
+            itemCount: services.length,
+            itemBuilder: (context, index) {
+              final srv = services[index];
+              return Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: SiragroColors.brandDark,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(srv.icon, color: SiragroColors.brassSoft, size: 24),
+                    const SizedBox(height: 6),
+                    Text(
+                      srv.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      srv.desc,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFCBD5E1),
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveryCoverageSection extends StatelessWidget {
+  final VoidCallback onViewDetails;
+
+  const _DeliveryCoverageSection({required this.onViewDetails});
+
+  @override
+  Widget build(BuildContext context) {
+    const zones = [
+      (
+        zone: 'Local Delivery (Up to 1 mile)',
+        fee: 'FREE on orders strictly over £25',
+      ),
+      (
+        zone: 'Local Delivery (1 – 5 miles)',
+        fee: 'Delivery charge applies (awaiting store confirmation)',
+      ),
+      (
+        zone: 'Beyond 5 miles',
+        fee: 'Home delivery unavailable',
+      ),
+      (
+        zone: 'Click & Collect (UB3 4NS)',
+        fee: 'Store collection available (Free, ready in 30 mins)',
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 22, 16, 32),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Local Delivery Coverage',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onViewDetails,
+                    child: const Text('Full info'),
+                  ),
+                ],
+              ),
+              const Text(
+                'Dispatched from 147 North Hyde Road, Hayes UB3 4NS (up to 5 miles)',
+                style: TextStyle(color: SiragroColors.textMuted, fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              ...zones.map(
+                (z) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.local_shipping_outlined,
+                        size: 16,
+                        color: SiragroColors.brand,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              z.zone,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              z.fee,
+                              style: const TextStyle(
+                                color: SiragroColors.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

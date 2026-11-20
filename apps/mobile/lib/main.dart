@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/app.dart';
 import 'app/theme/siragro_theme.dart';
 import 'core/config/app_config.dart';
-import 'shared/widgets/siragro_logo.dart';
+import 'core/widgets/siragro_intro.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,7 +19,8 @@ class _BootstrapApp extends StatefulWidget {
 }
 
 class _BootstrapAppState extends State<_BootstrapApp> {
-  bool _ready = false;
+  bool _initDone = false;
+  bool _introDone = false;
 
   @override
   void initState() {
@@ -36,27 +37,29 @@ class _BootstrapAppState extends State<_BootstrapApp> {
       );
     }
     if (mounted) {
-      setState(() => _ready = true);
+      setState(() => _initDone = true);
+    }
+  }
+
+  void _onIntroComplete() {
+    if (mounted && !_introDone) {
+      setState(() => _introDone = true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final ready = _initDone && _introDone;
 
     return AnimatedSwitcher(
-      duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 220),
-      child: !_ready
+      duration: reduceMotion ? Duration.zero : const Duration(milliseconds: 240),
+      child: !ready
           ? MaterialApp(
-              key: const ValueKey('bootstrap-splash'),
+              key: const ValueKey('bootstrap-intro'),
               debugShowCheckedModeBanner: false,
               theme: SiragroTheme.light(),
-              home: const Scaffold(
-                backgroundColor: SiragroColors.brand,
-                body: Center(
-                  child: SiragroLogo(size: 96),
-                ),
-              ),
+              home: SiragroAnimatedIntro(onCompleted: _onIntroComplete),
             )
           : const ProviderScope(
               key: ValueKey('bootstrap-app'),
