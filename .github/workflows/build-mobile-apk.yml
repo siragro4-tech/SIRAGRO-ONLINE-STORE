@@ -43,6 +43,19 @@ jobs:
         working-directory: apps/mobile
         run: flutter pub get
 
+      - name: Generate SIRAGRO Android launcher icons
+        working-directory: apps/mobile
+        run: dart run flutter_launcher_icons
+
+      - name: Generate SIRAGRO Android launch splash screen
+        working-directory: apps/mobile
+        run: dart run flutter_native_splash:create
+
+      - name: Verify generated Android icon & splash resources
+        run: |
+          test -f apps/mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          test -f apps/mobile/android/app/src/main/res/drawable/launch_background.xml
+
       - name: Analyze Flutter code
         working-directory: apps/mobile
         run: flutter analyze --no-fatal-infos

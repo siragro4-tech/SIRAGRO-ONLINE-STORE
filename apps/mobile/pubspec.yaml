@@ -30,6 +30,26 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/siragro-icon-legacy.png"
+  image_path_ios: "assets/branding/siragro-icon-ios.png"
+  adaptive_icon_background: "#323C4B"
+  adaptive_icon_foreground: "assets/branding/siragro-adaptive-foreground.png"
+
+flutter_native_splash:
+  color: "#323C4B"
+  image: "assets/branding/siragro-splash-logo.png"
+  ios_content_mode: center
+  android_12:
+    color: "#323C4B"
+    image: "assets/branding/siragro-splash-logo.png"
+    icon_background_color: "#323C4B"
 
 flutter:
   uses-material-design: true

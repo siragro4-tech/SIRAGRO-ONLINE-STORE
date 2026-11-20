@@ -76,3 +76,25 @@ To build a debug Android APK (once Android SDK is configured):
 ```bash
 flutter build apk --debug
 ```
+
+---
+
+## Native Launcher Icons & Launch Splash Generation
+
+Branding PNG derivatives generated from `public/images/siragro-logo.jpg` live in `apps/mobile/assets/branding/` and are configured in `pubspec.yaml` via `flutter_launcher_icons` and `flutter_native_splash`.
+
+Because `apps/mobile/android/` and `apps/mobile/ios/` are not yet checked into the repository (and Flutter is required to generate native platform resources), run the following on a machine with Flutter installed — **never** run `flutter create .` directly inside `apps/mobile/`:
+
+```bash
+# 1. Scaffold platform folders in a temporary directory (from repo root)
+flutter create --platforms=android,ios --org uk.co.siragro --project-name siragro_mobile temp_mobile_shell
+cp -r temp_mobile_shell/android apps/mobile/android
+cp -r temp_mobile_shell/ios apps/mobile/ios
+rm -rf temp_mobile_shell
+
+# 2. Fetch packages and generate native icons & splash screens
+cd apps/mobile
+flutter pub get
+dart run flutter_launcher_icons
+dart run flutter_native_splash:create
+```
