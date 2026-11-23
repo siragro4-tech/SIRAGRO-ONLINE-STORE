@@ -44,7 +44,11 @@ export async function GET() {
 
   if (categoriesRes.error || featuredRes.error) {
     return jsonNoStore(
-      { error: "Unable to load store home data right now. Please retry." },
+      {
+        error: "Unable to load store home data right now. Please retry.",
+        categoriesError: categoriesRes.error?.message ?? null,
+        featuredError: featuredRes.error?.message ?? null,
+      },
       500
     );
   }
