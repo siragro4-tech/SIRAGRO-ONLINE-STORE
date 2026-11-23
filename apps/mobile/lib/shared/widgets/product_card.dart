@@ -71,7 +71,7 @@ class _ProductCardState extends State<ProductCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AspectRatio(
-                  aspectRatio: 1.15,
+                  aspectRatio: 1.25,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [

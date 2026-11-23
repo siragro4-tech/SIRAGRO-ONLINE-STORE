@@ -97,7 +97,7 @@ void main() {
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 0.54,
+                childAspectRatio: 0.50,
               ),
               itemCount: 2,
               itemBuilder: (_, __) => ProductCard(
