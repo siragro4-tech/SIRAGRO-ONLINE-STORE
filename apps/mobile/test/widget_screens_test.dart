@@ -5,6 +5,7 @@ import 'package:siragro_mobile/app/theme/siragro_theme.dart';
 import 'package:siragro_mobile/features/basket/basket_controller.dart';
 import 'package:siragro_mobile/features/checkout/checkout_screen.dart';
 import 'package:siragro_mobile/shared/models/basket.dart';
+import 'package:siragro_mobile/shared/models/category.dart';
 import 'package:siragro_mobile/shared/models/fulfilment.dart';
 import 'package:siragro_mobile/shared/models/product.dart';
 import 'package:siragro_mobile/shared/widgets/product_card.dart';
@@ -55,6 +56,64 @@ void main() {
 
     expect(find.text('18+'), findsOneWidget);
     expect(find.text('£5.99'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'ProductCard fits inside 2-column GridView at 360px with long name, discount, and 1.3x text scale',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    const product = Product(
+      id: 'p-overflow',
+      name: 'Extra Long Heritage Farmhouse Stoneground Sourdough Loaf 800g',
+      slug: 'long-sourdough',
+      price: 2.85,
+      compareAtPrice: 3.40,
+      unit: '800g Family Loaf',
+      brand: 'Baker & Son',
+      stockQuantity: 3,
+      isAvailable: true,
+      isAgeRestricted: true,
+      minimumAge: 18,
+      category: StoreCategory(
+        id: 'c-1',
+        name: 'Fresh Bakery & Pastries',
+        slug: 'bakery',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+        child: MaterialApp(
+          theme: SiragroTheme.light(),
+          home: Scaffold(
+            body: GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.54,
+              ),
+              itemCount: 2,
+              itemBuilder: (_, __) => ProductCard(
+                product: product,
+                onTap: () {},
+                onAddToBasket: () async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('£2.85'), findsNWidgets(2));
   });
 
   testWidgets('CheckoutScreen blocks Home Delivery when pricing is unconfirmed',

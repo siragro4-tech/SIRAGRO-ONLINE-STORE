@@ -343,7 +343,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             crossAxisCount: crossAxisCount,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
-                            childAspectRatio: 0.56,
+                            childAspectRatio: 0.54,
                           ),
                           itemCount: data.featuredProducts.length,
                           itemBuilder: (context, index) {
@@ -786,49 +786,55 @@ class _DepartmentGrid extends StatelessWidget {
           itemCount: categories.length,
           itemBuilder: (context, index) {
             final cat = categories[index];
-            return Material(
-              color: SiragroColors.surfaceWarm,
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
+            return StaggeredEntrance(
+              index: index,
+              child: Material(
+                color: SiragroColors.surfaceWarm,
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => onSelect(cat.slug),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: SiragroColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: SiragroColors.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: SiragroColors.border),
-                        ),
-                        child: Icon(
-                          _iconForSlug(cat.slug),
-                          size: 18,
-                          color: SiragroColors.brand,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          cat.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => onSelect(cat.slug),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: SiragroColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: SiragroColors.surface,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: SiragroColors.border),
+                          ),
+                          child: Icon(
+                            _iconForSlug(cat.slug),
+                            size: 18,
                             color: SiragroColors.brand,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w800,
-                            height: 1.2,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            cat.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SiragroColors.brand,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              height: 1.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
