@@ -18,7 +18,8 @@ const bool _captureScreenshots =
 
 class _EmptyBasketController extends BasketController {
   @override
-  Future<BasketSummary> build() async => const BasketSummary.empty();
+  Future<BasketSummary> build() async =>
+      const BasketSummary(items: [], itemCount: 0, subtotal: 0);
 }
 
 Future<void> _savePngIfEnabled(
