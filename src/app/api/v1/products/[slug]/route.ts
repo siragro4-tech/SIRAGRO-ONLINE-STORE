@@ -29,7 +29,7 @@ export async function GET(
     .select(
       `
       *,
-      category:categories(id, name, slug, icon, sort_order, is_active),
+      category:categories(id, name, slug, image_url, sort_order, is_active),
       images:product_images(id, storage_path, alt_text, is_primary, sort_order)
     `
     )
