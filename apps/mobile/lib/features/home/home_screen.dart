@@ -78,15 +78,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final PageController _bannerController = PageController();
-  int _bannerIndex = 0;
   String? _addingProductId;
-
-  @override
-  void dispose() {
-    _bannerController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,7 +143,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        '147 North Hyde Rd, Hayes UB3 4NS • Daily 7am–10pm • Challenge 25',
+                        '147 North Hyde Road, Hayes UB3 4NS • 020 8813 6458 • Daily: 7am – 10pm • Challenge 25',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -166,10 +158,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-            // Editorial search entry bar
+            // 1. Cinematic Hero Section (matches website section 1)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                child: _WebsiteHeroBanner(
+                  onShopNow: () => context.go('/shop'),
+                  onExploreStore: () => context.push('/support/delivery'),
+                ),
+              ),
+            ),
+
+            // Quick search bar
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 child: Material(
                   color: SiragroColors.surface,
                   borderRadius: BorderRadius.circular(14),
@@ -177,7 +180,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     borderRadius: BorderRadius.circular(14),
                     onTap: () => context.go('/shop?focusSearch=1'),
                     child: Container(
-                      height: 50,
+                      height: 48,
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
@@ -210,20 +213,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-            // Refined swipeable storefront carousel (approved assets only)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: _StoreHeroCarousel(
-                  controller: _bannerController,
-                  currentIndex: _bannerIndex,
-                  onPageChanged: (idx) => setState(() => _bannerIndex = idx),
-                  onBrowseShop: () => context.go('/shop'),
-                  onDeliveryInfo: () => context.push('/support/delivery'),
-                ),
-              ),
-            ),
-
             homeAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: Padding(
@@ -247,13 +236,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Shop by Aisle',
-                            style: Theme.of(context).textTheme.titleLarge,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Shop by Department',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const Text(
+                                  'Everyday supermarket fresh stock',
+                                  style: TextStyle(
+                                    color: SiragroColors.textMuted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           TextButton(
                             onPressed: () => context.go('/shop'),
-                            child: const Text('All aisles'),
+                            child: const Text('View All →'),
                           ),
                         ],
                       ),
@@ -284,13 +287,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'In Store Selection',
-                          style: Theme.of(context).textTheme.titleLarge,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Popular In Store',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const Text(
+                                'Available for same-day delivery or collection',
+                                style: TextStyle(
+                                  color: SiragroColors.textMuted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         TextButton(
                           onPressed: () => context.go('/shop'),
-                          child: const Text('Browse all'),
+                          child: const Text('Explore Catalogue →'),
                         ),
                       ],
                     ),
@@ -376,213 +393,128 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _StoreHeroCarousel extends StatelessWidget {
-  final PageController controller;
-  final int currentIndex;
-  final ValueChanged<int> onPageChanged;
-  final VoidCallback onBrowseShop;
-  final VoidCallback onDeliveryInfo;
+class _WebsiteHeroBanner extends StatelessWidget {
+  final VoidCallback onShopNow;
+  final VoidCallback onExploreStore;
 
-  const _StoreHeroCarousel({
-    required this.controller,
-    required this.currentIndex,
-    required this.onPageChanged,
-    required this.onBrowseShop,
-    required this.onDeliveryInfo,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final slides = [
-      _HeroSlide(
-        eyebrow: 'SIRAGRO SUPERMARKET & OFF-LICENCE',
-        title: 'Fresh Choices.\nEveryday Essentials.',
-        subtitle:
-            'Your local supermarket for fresh groceries, everyday essentials and more.',
-        buttonLabel: 'Shop Now',
-        onPressed: onBrowseShop,
-        usePhoto: true,
-      ),
-      _HeroSlide(
-        eyebrow: 'CLICK & COLLECT • HAYES UB3 4NS',
-        title: '147 North Hyde Road',
-        subtitle:
-            'Free in-store collection in 30 mins. Check live delivery availability before checkout.',
-        buttonLabel: 'Delivery & Collection',
-        onPressed: onDeliveryInfo,
-        usePhoto: false,
-      ),
-    ];
-
-    final animDuration = SiragroMotion.duration(
-      context,
-      normal: const Duration(milliseconds: 240),
-    );
-
-    return Column(
-      children: [
-        SizedBox(
-          height: 212,
-          child: PageView.builder(
-            controller: controller,
-            itemCount: slides.length,
-            onPageChanged: onPageChanged,
-            itemBuilder: (context, index) => slides[index],
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              tooltip: 'Previous slide',
-              visualDensity: VisualDensity.compact,
-              onPressed: currentIndex > 0
-                  ? () => controller.previousPage(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutCubic,
-                      )
-                  : null,
-              icon: const Icon(Icons.chevron_left_rounded, size: 22),
-            ),
-            ...List.generate(slides.length, (idx) {
-              final active = idx == currentIndex;
-              return Semantics(
-                label: 'Slide ${idx + 1} of ${slides.length}',
-                selected: active,
-                child: AnimatedContainer(
-                  duration: animDuration,
-                  curve: Curves.easeOutCubic,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: active ? 22 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: active ? SiragroColors.brand : SiragroColors.borderStrong,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              );
-            }),
-            IconButton(
-              tooltip: 'Next slide',
-              visualDensity: VisualDensity.compact,
-              onPressed: currentIndex < slides.length - 1
-                  ? () => controller.nextPage(
-                        duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutCubic,
-                      )
-                  : null,
-              icon: const Icon(Icons.chevron_right_rounded, size: 22),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroSlide extends StatelessWidget {
-  final String eyebrow;
-  final String title;
-  final String subtitle;
-  final String buttonLabel;
-  final VoidCallback onPressed;
-  final bool usePhoto;
-
-  const _HeroSlide({
-    required this.eyebrow,
-    required this.title,
-    required this.subtitle,
-    required this.buttonLabel,
-    required this.onPressed,
-    required this.usePhoto,
+  const _WebsiteHeroBanner({
+    required this.onShopNow,
+    required this.onExploreStore,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: SiragroColors.brand,
-        borderRadius: BorderRadius.circular(18),
+        color: SiragroColors.brandDark,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: SiragroColors.brandDark),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
-        fit: StackFit.expand,
         children: [
-          if (usePhoto) ...[
-            Image.asset(
+          Positioned.fill(
+            child: Image.asset(
               'assets/images/hero-supermarket.jpg',
               fit: BoxFit.cover,
+              alignment: const Alignment(0, -0.24),
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-            Container(
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                   colors: [
-                    SiragroColors.brandDark.withValues(alpha: 0.88),
-                    SiragroColors.brand.withValues(alpha: 0.68),
-                    SiragroColors.brand.withValues(alpha: 0.35),
+                    SiragroColors.brandDark.withValues(alpha: 0.86),
+                    SiragroColors.brand.withValues(alpha: 0.56),
+                    SiragroColors.brand.withValues(alpha: 0.24),
                   ],
                 ),
               ),
             ),
-          ],
+          ),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  eyebrow,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: SiragroColors.brassTint,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
-                    height: 1.15,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFE2E8F0),
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                ElevatedButton(
-                  onPressed: onPressed,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: SiragroColors.brand,
-                    minimumSize: const Size(44, 40),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                  child: const Text(
+                    'SIRAGRO SUPERMARKET & OFF-LICENCE',
+                    style: TextStyle(
+                      color: SiragroColors.brand,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.7,
                     ),
                   ),
-                  child: Text(buttonLabel),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Fresh Choices.\nEveryday Essentials.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Your local supermarket for fresh groceries, everyday essentials and more. Shop with us today!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    ElevatedButton(
+                      onPressed: onShopNow,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: SiragroColors.brand,
+                        minimumSize: const Size(44, 42),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 10,
+                        ),
+                      ),
+                      child: const Text('Shop Now'),
+                    ),
+                    OutlinedButton(
+                      onPressed: onExploreStore,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor:
+                            SiragroColors.brandDark.withValues(alpha: 0.85),
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white, width: 1.5),
+                        minimumSize: const Size(44, 42),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                      child: const Text('Explore Our Store'),
+                    ),
+                  ],
                 ),
               ],
             ),

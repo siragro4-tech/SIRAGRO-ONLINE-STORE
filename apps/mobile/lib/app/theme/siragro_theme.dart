@@ -12,14 +12,14 @@ class SiragroColors {
   static const Color brandTint = Color(0xFFF1F4F8);
   static const Color brandMuted = Color(0xFFE4E9F0);
 
-  // Warm Neutrals
-  static const Color canvas = Color(0xFFFAF9F6);
+  // Website-matched Neutrals (#f4f6f9 page muted bg, #ffffff cards)
+  static const Color canvas = Color(0xFFF4F6F9);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceWarm = Color(0xFFF2EFE9);
+  static const Color surfaceWarm = Color(0xFFF8FAFC);
   static const Color textPrimary = Color(0xFF1E2530);
-  static const Color textMuted = Color(0xFF5F6B7A);
-  static const Color border = Color(0xFFE5E2DC);
-  static const Color borderStrong = Color(0xFFCBD5E1);
+  static const Color textMuted = Color(0xFF64748B);
+  static const Color border = Color(0xFFCBD5E1);
+  static const Color borderStrong = Color(0xFF94A3B8);
 
   // Restrained Accents
   static const Color sage = Color(0xFF3F6B52);
