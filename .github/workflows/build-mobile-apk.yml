@@ -79,7 +79,17 @@ jobs:
 
       - name: Analyze Flutter code
         working-directory: apps/mobile
-        run: flutter analyze --no-fatal-infos
+        run: |
+          set +e
+          OUT=$(flutter analyze --no-fatal-infos 2>&1)
+          RC=$?
+          echo "$OUT"
+          if [ $RC -ne 0 ]; then
+            echo "$OUT" | grep -E "error •|warning •" | head -n 10 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit $RC
+          fi
 
       - name: Run Flutter unit, widget & phone-viewport screenshot tests
         working-directory: apps/mobile
