@@ -71,7 +71,7 @@ class _ProductCardState extends State<ProductCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AspectRatio(
-                  aspectRatio: 1,
+                  aspectRatio: 1.15,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -169,120 +169,143 @@ class _ProductCardState extends State<ProductCard> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (product.category != null)
-                  Text(
-                    product.category!.name.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                      color: SiragroColors.sage,
-                    ),
-                  ),
-                const SizedBox(height: 2),
-                Text(
-                  product.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: SiragroColors.textPrimary,
-                    height: 1.25,
-                  ),
-                ),
-                if (product.unit != null && product.unit!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    product.unit!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: SiragroColors.textMuted,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Column(
+                const SizedBox(height: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (product.category != null) ...[
+                            Text(
+                              product.category!.name.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: SiragroColors.sage,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                          ],
                           Text(
-                            '£${product.price.toStringAsFixed(2)}',
+                            product.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: SiragroColors.brand,
-                              fontFeatures: [FontFeature.tabularFigures()],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: SiragroColors.textPrimary,
+                              height: 1.2,
                             ),
                           ),
-                          if (product.hasDiscount)
+                          if (product.unit != null &&
+                              product.unit!.isNotEmpty) ...[
+                            const SizedBox(height: 2),
                             Text(
-                              '£${product.compareAtPrice!.toStringAsFixed(2)}',
+                              product.unit!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: SiragroColors.textMuted,
-                                decoration: TextDecoration.lineThrough,
-                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '£${product.price.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: SiragroColors.brand,
+                                    fontFeatures: [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                                if (product.hasDiscount)
+                                  Text(
+                                    '£${product.compareAtPrice!.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      color: SiragroColors.textMuted,
+                                      decoration: TextDecoration.lineThrough,
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (!product.isOutOfStock &&
+                              widget.onAddToBasket != null)
+                            AnimatedContainer(
+                              duration: animDuration,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: _justAdded
+                                    ? SiragroColors.sage
+                                    : SiragroColors.brand,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: widget.isAdding ? null : _handleAdd,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                  child: AnimatedSwitcher(
+                                    duration: animDuration,
+                                    child: widget.isAdding
+                                        ? const SizedBox(
+                                            key: ValueKey('loading'),
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : _justAdded
+                                            ? const Icon(
+                                                Icons.check_rounded,
+                                                key: ValueKey('added'),
+                                                color: Colors.white,
+                                                size: 18,
+                                              )
+                                            : const Icon(
+                                                Icons
+                                                    .add_shopping_cart_rounded,
+                                                key: ValueKey('add'),
+                                                color: Colors.white,
+                                                size: 18,
+                                              ),
+                                  ),
+                                ),
                               ),
                             ),
                         ],
                       ),
-                    ),
-                    if (!product.isOutOfStock && widget.onAddToBasket != null)
-                      AnimatedContainer(
-                        duration: animDuration,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _justAdded
-                              ? SiragroColors.sage
-                              : SiragroColors.brand,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(11),
-                          onTap: widget.isAdding ? null : _handleAdd,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 11),
-                            child: AnimatedSwitcher(
-                              duration: animDuration,
-                              child: widget.isAdding
-                                  ? const SizedBox(
-                                      key: ValueKey('loading'),
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : _justAdded
-                                      ? const Icon(
-                                          Icons.check_rounded,
-                                          key: ValueKey('added'),
-                                          color: Colors.white,
-                                          size: 18,
-                                        )
-                                      : const Icon(
-                                          Icons.add_shopping_cart_rounded,
-                                          key: ValueKey('add'),
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
