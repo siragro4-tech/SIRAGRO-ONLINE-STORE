@@ -86,30 +86,57 @@ class _ProductCardState extends State<ProductCard> {
                           child: _buildProductImage(product),
                         ),
                       ),
-                      if (product.isAgeRestricted)
+                      if (product.hasDiscount || product.isAgeRestricted)
                         Positioned(
                           top: 6,
                           left: 6,
-                          child: Semantics(
-                            label: 'Age restricted ${product.minimumAge} plus',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: SiragroColors.accentRed,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                '${product.minimumAge}+',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w800,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (product.hasDiscount)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: SiragroColors.brand,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Save £${(product.compareAtPrice! - product.price).toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
+                              if (product.isAgeRestricted)
+                                Semantics(
+                                  label:
+                                      'Age restricted ${product.minimumAge} plus',
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: SiragroColors.accentRed,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${product.minimumAge}+',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       if (product.isLowStock && !product.isOutOfStock)
