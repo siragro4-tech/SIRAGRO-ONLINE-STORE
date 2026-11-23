@@ -78,7 +78,24 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final GlobalKey _deptKey = GlobalKey();
   String? _addingProductId;
+
+  void _scrollToDepartments() {
+    final targetContext = _deptKey.currentContext;
+    if (targetContext == null) {
+      context.go('/shop');
+      return;
+    }
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: SiragroMotion.duration(
+        context,
+        normal: const Duration(milliseconds: 360),
+      ),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 child: _WebsiteHeroBanner(
                   onShopNow: () => context.go('/shop'),
-                  onExploreStore: () => context.push('/support/delivery'),
+                  onExploreStore: _scrollToDepartments,
                 ),
               ),
             ),
@@ -232,7 +249,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 delegate: SliverChildListDelegate([
                   if (data.categories.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      key: _deptKey,
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -261,24 +279,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ],
                       ),
                     ),
-                    SizedBox(
-                      height: 44,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: data.categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final cat = data.categories[index];
-                          return ActionChip(
-                            label: Text(cat.name),
-                            backgroundColor: SiragroColors.surface,
-                            side: const BorderSide(color: SiragroColors.border),
-                            onPressed: () =>
-                                context.go('/shop?category=${cat.slug}'),
-                          );
-                        },
-                      ),
+                    _DepartmentGrid(
+                      categories: data.categories,
+                      onSelect: (slug) => context.go('/shop?category=$slug'),
                     ),
                   ],
 
@@ -375,14 +378,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         );
                       },
                     ),
-                  if (data.featuredProducts.isNotEmpty) ...[
-                    // In-Store Counter Services (matches website section 4)
-                    _InStoreServicesSection(),
-                    // Local Delivery Coverage (matches website section 5)
-                    _DeliveryCoverageSection(
-                      onViewDetails: () => context.push('/support/delivery'),
-                    ),
-                  ],
+                  // 4. In-Store Counter Services (matches website section 4)
+                  _InStoreServicesSection(),
+                  // 5. Local Delivery Coverage (matches website section 5)
+                  _DeliveryCoverageSection(
+                    onViewDetails: () => context.push('/support/delivery'),
+                  ),
+                  // 6. Storefront Footer (matches website Footer.tsx)
+                  _StorefrontFooterSection(
+                    onDeliveryInfo: () => context.push('/support/delivery'),
+                    onContact: () => context.push('/support/contact'),
+                    onAbout: () => context.push('/support/about'),
+                    onAccount: () => context.go('/account'),
+                    onTerms: () => context.push('/support/terms'),
+                    onPrivacy: () => context.push('/support/privacy'),
+                  ),
                 ]),
               ),
             ),
@@ -708,10 +718,275 @@ class _DeliveryCoverageSection extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 6),
+              const Text(
+                'Postcode verified at checkout using straight-line distance from UB3 4NS. Home delivery checkout opens once all store delivery fees are confirmed.',
+                style: TextStyle(
+                  color: SiragroColors.textMuted,
+                  fontSize: 11.5,
+                  height: 1.35,
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DepartmentGrid extends StatelessWidget {
+  final List<StoreCategory> categories;
+  final ValueChanged<String> onSelect;
+
+  const _DepartmentGrid({
+    required this.categories,
+    required this.onSelect,
+  });
+
+  static IconData _iconForSlug(String slug) {
+    switch (slug) {
+      case 'fresh-produce':
+        return Icons.eco_outlined;
+      case 'dairy-eggs':
+        return Icons.egg_alt_outlined;
+      case 'bakery':
+        return Icons.bakery_dining_outlined;
+      case 'meat-fish':
+        return Icons.set_meal_outlined;
+      case 'off-licence-beverages':
+      case 'drinks-off-licence':
+        return Icons.wine_bar_outlined;
+      case 'cupboard-groceries':
+        return Icons.kitchen_outlined;
+      case 'frozen-goods':
+        return Icons.ac_unit_rounded;
+      case 'household-cleaning':
+        return Icons.cleaning_services_outlined;
+      default:
+        return Icons.shopping_basket_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth >= 720 ? 4 : 2;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.35,
+          ),
+          itemCount: categories.length,
+          itemBuilder: (context, index) {
+            final cat = categories[index];
+            return Material(
+              color: SiragroColors.surfaceWarm,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => onSelect(cat.slug),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: SiragroColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: SiragroColors.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: SiragroColors.border),
+                        ),
+                        child: Icon(
+                          _iconForSlug(cat.slug),
+                          size: 18,
+                          color: SiragroColors.brand,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          cat.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: SiragroColors.brand,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _StorefrontFooterSection extends StatelessWidget {
+  final VoidCallback onDeliveryInfo;
+  final VoidCallback onContact;
+  final VoidCallback onAbout;
+  final VoidCallback onAccount;
+  final VoidCallback onTerms;
+  final VoidCallback onPrivacy;
+
+  const _StorefrontFooterSection({
+    required this.onDeliveryInfo,
+    required this.onContact,
+    required this.onAbout,
+    required this.onAccount,
+    required this.onTerms,
+    required this.onPrivacy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: SiragroColors.brandDark,
+      padding: const EdgeInsets.fromLTRB(16, 26, 16, 34),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              SiragroLogo(size: 46),
+              SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SIRAGRO',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  Text(
+                    'SUPERMARKET & OFF-LICENCE',
+                    style: TextStyle(
+                      color: Color(0xFFCBD5E1),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Your trusted local supermarket and licensed off-licence in Hayes, UB3. Fresh groceries, chilled beverages, pantry goods and friendly counter service.',
+            style: TextStyle(
+              color: Color(0xFFDCE3EC),
+              fontSize: 12.5,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _FooterLinkChip(label: 'Delivery Info', onTap: onDeliveryInfo),
+              _FooterLinkChip(label: 'Contact Us & Map', onTap: onContact),
+              _FooterLinkChip(label: 'About SIRAGRO', onTap: onAbout),
+              _FooterLinkChip(label: 'My Account', onTap: onAccount),
+              _FooterLinkChip(label: 'Terms & Conditions', onTap: onTerms),
+              _FooterLinkChip(label: 'Privacy Policy', onTap: onPrivacy),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: SiragroColors.brand,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.16),
+              ),
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CHALLENGE 25',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Under the Licensing Act 2003, it is an offence to sell alcohol to anyone under 18. Valid photo ID required.',
+                  style: TextStyle(
+                    color: Color(0xFFDCE3EC),
+                    fontSize: 11.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: Color(0xFF3D495B), height: 1),
+          const SizedBox(height: 12),
+          const Text(
+            '© 2026 SIRAGRO. 147 North Hyde Road, Hayes, Middlesex UB3 4NS. All rights reserved.',
+            style: TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FooterLinkChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _FooterLinkChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      label: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      backgroundColor: SiragroColors.brand,
+      side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+      onPressed: onTap,
     );
   }
 }
