@@ -23,16 +23,14 @@ class _EmptyBasketController extends BasketController {
 
 Future<void> _savePngIfEnabled(
   WidgetTester tester,
-  GlobalKey boundaryKey,
   String filename,
 ) async {
   if (!_captureScreenshots) return;
+  final element = tester.element(find.byType(MaterialApp));
   await tester.binding.runAsync(() async {
-    final boundary = boundaryKey.currentContext?.findRenderObject()
-        as RenderRepaintBoundary?;
-    if (boundary == null) return;
-    final image = await boundary.toImage(pixelRatio: 2.0);
+    final image = await captureImage(element);
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
     if (byteData == null) return;
     final dir = Directory('build/screenshots');
     if (!dir.existsSync()) {
@@ -105,13 +103,13 @@ void main() {
     }),
   ];
 
-  testWidgets('Phone viewport (390x844) Home, ProductDetail, and Account render without overflow',
+  testWidgets(
+      'Phone viewport (390x844) Home, ProductDetail, and Account render without overflow',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    final boundaryKey = GlobalKey();
     final homeData = HomeData(
       categories: sampleCategories,
       featuredProducts: sampleProducts,
@@ -127,69 +125,56 @@ void main() {
       ProviderScope(
         overrides: [
           homeDataProvider.overrideWith((ref) async => homeData),
-          basketControllerProvider.overrideWith(_EmptyBasketController.new),
+          basketControllerProvider.overrideWith(() => _EmptyBasketController()),
         ],
-        child: RepaintBoundary(
-          key: boundaryKey,
-          child: MaterialApp(
-            theme: SiragroTheme.light(),
-            home: const HomeScreen(),
-          ),
+        child: MaterialApp(
+          theme: SiragroTheme.light(),
+          home: const HomeScreen(),
         ),
       ),
     );
 
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_top.png');
+    await _savePngIfEnabled(tester, 'flutter_home_top.png');
 
-    // Scroll to mid sections (Popular In Store & In-Store Services)
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -650));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_mid.png');
+    await _savePngIfEnabled(tester, 'flutter_home_mid.png');
 
-    // Scroll to footer
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -1100));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_footer.png');
+    await _savePngIfEnabled(tester, 'flutter_home_footer.png');
 
-    // Product Detail screen
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           productDetailProvider('dev-gala-apples-6pk')
               .overrideWith((ref) async => sampleProducts.first),
-          basketControllerProvider.overrideWith(_EmptyBasketController.new),
+          basketControllerProvider.overrideWith(() => _EmptyBasketController()),
         ],
-        child: RepaintBoundary(
-          key: boundaryKey,
-          child: MaterialApp(
-            theme: SiragroTheme.light(),
-            home: const ProductDetailScreen(slug: 'dev-gala-apples-6pk'),
-          ),
+        child: MaterialApp(
+          theme: SiragroTheme.light(),
+          home: const ProductDetailScreen(slug: 'dev-gala-apples-6pk'),
         ),
       ),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await _savePngIfEnabled(tester, boundaryKey, 'flutter_product_detail.png');
+    await _savePngIfEnabled(tester, 'flutter_product_detail.png');
 
-    // Account screen
     await tester.pumpWidget(
       ProviderScope(
-        child: RepaintBoundary(
-          key: boundaryKey,
-          child: MaterialApp(
-            theme: SiragroTheme.light(),
-            home: const AccountScreen(),
-          ),
+        child: MaterialApp(
+          theme: SiragroTheme.light(),
+          home: const AccountScreen(),
         ),
       ),
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await _savePngIfEnabled(tester, boundaryKey, 'flutter_account.png');
+    await _savePngIfEnabled(tester, 'flutter_account.png');
   });
 }
