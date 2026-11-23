@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../app/theme/siragro_theme.dart';
 import '../../core/widgets/motion.dart';
 import '../models/product.dart';
+import 'category_mockup.dart';
 
 class ProductCard extends StatefulWidget {
   final Product product;
@@ -294,14 +295,9 @@ class _ProductCardState extends State<ProductCard> {
   Widget _buildProductImage(Product product) {
     final url = product.primaryImageUrl;
     if (url == null || url.isEmpty || url.startsWith('/images/placeholder')) {
-      return Center(
-        child: Icon(
-          product.isAgeRestricted
-              ? Icons.wine_bar_outlined
-              : Icons.shopping_basket_outlined,
-          size: 36,
-          color: SiragroColors.brandLight.withValues(alpha: 0.55),
-        ),
+      return CategoryMockupCard(
+        categorySlug: product.category?.slug,
+        brand: product.brand,
       );
     }
 

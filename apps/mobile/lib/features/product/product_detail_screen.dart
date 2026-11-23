@@ -7,6 +7,7 @@ import '../../core/preview/design_preview_fixtures.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/widgets/state_views.dart';
 import '../../shared/models/product.dart';
+import '../../shared/widgets/category_mockup.dart';
 import '../basket/basket_controller.dart';
 
 final productDetailProvider =
@@ -77,12 +78,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                     clipBehavior: Clip.antiAlias,
                     child: gallery.isEmpty
                         ? Center(
-                            child: Icon(
-                              product.isAgeRestricted
-                                  ? Icons.wine_bar_outlined
-                                  : Icons.shopping_basket_outlined,
-                              size: 64,
-                              color: SiragroColors.brandLight.withValues(alpha: 0.55),
+                            child: CategoryMockupCard(
+                              categorySlug: product.category?.slug,
+                              brand: product.brand,
+                              iconSize: 64,
                             ),
                           )
                         : Stack(

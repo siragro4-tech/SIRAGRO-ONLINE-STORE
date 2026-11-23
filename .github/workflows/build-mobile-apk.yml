@@ -85,12 +85,27 @@ jobs:
         working-directory: apps/mobile
         run: flutter test
 
-      - name: Build offline Debug Design Preview APK
+      - name: Build Staging Debug APK
         working-directory: apps/mobile
+        env:
+          SIRAGRO_API_BASE_URL: ${{ secrets.SIRAGRO_STAGING_API_URL }}
+          SIRAGRO_SUPABASE_URL: ${{ secrets.SIRAGRO_STAGING_SUPABASE_URL }}
+          SIRAGRO_SUPABASE_ANON_KEY: ${{ secrets.SIRAGRO_STAGING_SUPABASE_ANON_KEY }}
         run: |
-          flutter build apk --debug \
-            --dart-define=SIRAGRO_ENV=preview \
-            --dart-define=SIRAGRO_DESIGN_PREVIEW=true
+          if [ -n "${SIRAGRO_API_BASE_URL}" ] && [ -n "${SIRAGRO_SUPABASE_URL}" ] && [ -n "${SIRAGRO_SUPABASE_ANON_KEY}" ]; then
+            echo "Building staging-connected APK (SIRAGRO_DESIGN_PREVIEW=false)"
+            flutter build apk --debug \
+              --dart-define=SIRAGRO_ENV=staging \
+              --dart-define=SIRAGRO_DESIGN_PREVIEW=false \
+              --dart-define=SIRAGRO_API_BASE_URL="${SIRAGRO_API_BASE_URL}" \
+              --dart-define=SIRAGRO_SUPABASE_URL="${SIRAGRO_SUPABASE_URL}" \
+              --dart-define=SIRAGRO_SUPABASE_ANON_KEY="${SIRAGRO_SUPABASE_ANON_KEY}"
+          else
+            echo "Staging secrets missing; falling back to offline Design Preview APK"
+            flutter build apk --debug \
+              --dart-define=SIRAGRO_ENV=preview \
+              --dart-define=SIRAGRO_DESIGN_PREVIEW=true
+          fi
 
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
