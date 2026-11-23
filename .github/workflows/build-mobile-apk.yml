@@ -93,7 +93,17 @@ jobs:
 
       - name: Run Flutter unit, widget & phone-viewport screenshot tests
         working-directory: apps/mobile
-        run: flutter test --dart-define=SIRAGRO_CAPTURE_SCREENSHOTS=true
+        run: |
+          set +e
+          OUT=$(flutter test --dart-define=SIRAGRO_CAPTURE_SCREENSHOTS=true 2>&1)
+          RC=$?
+          echo "$OUT"
+          if [ $RC -ne 0 ]; then
+            echo "$OUT" | grep -iE "EXCEPTION|Error|FAILED|overflowed|Expected:" | head -n 10 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit $RC
+          fi
 
       - name: Capture website phone-viewport screenshots (390x844)
         run: |
