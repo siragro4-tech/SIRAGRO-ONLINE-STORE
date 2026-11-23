@@ -81,9 +81,18 @@ jobs:
         working-directory: apps/mobile
         run: flutter analyze --no-fatal-infos
 
-      - name: Run Flutter unit & widget tests
+      - name: Run Flutter unit, widget & phone-viewport screenshot tests
         working-directory: apps/mobile
-        run: flutter test
+        run: flutter test --dart-define=SIRAGRO_CAPTURE_SCREENSHOTS=true
+
+      - name: Capture website phone-viewport screenshots (390x844)
+        run: |
+          mkdir -p apps/mobile/build/screenshots
+          if command -v google-chrome >/dev/null 2>&1; then
+            google-chrome --headless --disable-gpu --window-size=390,844 --screenshot=apps/mobile/build/screenshots/website_home.png "https://siragro-online-store-2h6u4bp1i-siragro.vercel.app/" || true
+            google-chrome --headless --disable-gpu --window-size=390,844 --screenshot=apps/mobile/build/screenshots/website_shop.png "https://siragro-online-store-2h6u4bp1i-siragro.vercel.app/shop" || true
+          fi
+          ls -la apps/mobile/build/screenshots
 
       - name: Build Staging Debug APK
         working-directory: apps/mobile
@@ -114,4 +123,11 @@ jobs:
         with:
           name: siragro-customer-app-debug-apk
           path: apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+
+      - name: Upload Phone-Viewport Verification Screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: siragro-verification-screenshots
+          path: apps/mobile/build/screenshots/*.png
           retention-days: 14
