@@ -85,7 +85,7 @@ jobs:
           RC=$?
           echo "$OUT"
           if [ $RC -ne 0 ]; then
-            echo "$OUT" | grep -E "error •|warning •" | head -n 10 | while IFS= read -r line; do
+            echo "$OUT" | grep -iE "error|warning" | head -n 10 | while IFS= read -r line; do
               echo "::error::$line"
             done
             exit $RC
