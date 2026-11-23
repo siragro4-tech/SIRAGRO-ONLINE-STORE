@@ -92,20 +92,22 @@ jobs:
           SIRAGRO_SUPABASE_URL: ${{ secrets.SIRAGRO_STAGING_SUPABASE_URL }}
           SIRAGRO_SUPABASE_ANON_KEY: ${{ secrets.SIRAGRO_STAGING_SUPABASE_ANON_KEY }}
         run: |
-          if [ -n "${SIRAGRO_API_BASE_URL}" ] && [ -n "${SIRAGRO_SUPABASE_URL}" ] && [ -n "${SIRAGRO_SUPABASE_ANON_KEY}" ]; then
-            echo "Building staging-connected APK (SIRAGRO_DESIGN_PREVIEW=false)"
-            flutter build apk --debug \
-              --dart-define=SIRAGRO_ENV=staging \
-              --dart-define=SIRAGRO_DESIGN_PREVIEW=false \
-              --dart-define=SIRAGRO_API_BASE_URL="${SIRAGRO_API_BASE_URL}" \
-              --dart-define=SIRAGRO_SUPABASE_URL="${SIRAGRO_SUPABASE_URL}" \
-              --dart-define=SIRAGRO_SUPABASE_ANON_KEY="${SIRAGRO_SUPABASE_ANON_KEY}"
-          else
-            echo "Staging secrets missing; falling back to offline Design Preview APK"
-            flutter build apk --debug \
-              --dart-define=SIRAGRO_ENV=preview \
-              --dart-define=SIRAGRO_DESIGN_PREVIEW=true
+          if [ -z "${SIRAGRO_API_BASE_URL}" ] || [ -z "${SIRAGRO_SUPABASE_URL}" ] || [ -z "${SIRAGRO_SUPABASE_ANON_KEY}" ]; then
+            echo "::error::Missing required staging secrets (SIRAGRO_STAGING_API_URL, SIRAGRO_STAGING_SUPABASE_URL, SIRAGRO_STAGING_SUPABASE_ANON_KEY). Refusing to silently fall back to sample data."
+            exit 1
           fi
+          case "${SIRAGRO_SUPABASE_URL}" in
+            */rest/v1|*/rest/v1/)
+              echo "::error::SIRAGRO_STAGING_SUPABASE_URL must be the base project URL without /rest/v1/."
+              exit 1
+              ;;
+          esac
+          flutter build apk --debug \
+            --dart-define=SIRAGRO_ENV=staging \
+            --dart-define=SIRAGRO_DESIGN_PREVIEW=false \
+            --dart-define=SIRAGRO_API_BASE_URL="${SIRAGRO_API_BASE_URL}" \
+            --dart-define=SIRAGRO_SUPABASE_URL="${SIRAGRO_SUPABASE_URL}" \
+            --dart-define=SIRAGRO_SUPABASE_ANON_KEY="${SIRAGRO_SUPABASE_ANON_KEY}"
 
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
