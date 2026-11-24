@@ -101,6 +101,8 @@ jobs:
             curl -fsS "${SIRAGRO_API_BASE_URL}/api/v1/home" -o build/staging_home.json || true
             curl -fsS "${SIRAGRO_API_BASE_URL}/api/v1/products?page=1&limit=24" -o build/staging_products.json || true
           fi
+          curl -fsS "https://suucaqudzclmkcmcszkw.supabase.co/storage/v1/object/public/product-images/products/1794980202489-npphezk.jpg" -o build/perfume_atomizer.jpg || \
+            curl -fsS "https://dicduzekhpncfejksnev.supabase.co/storage/v1/object/public/product-images/products/1794980202489-npphezk.jpg" -o build/perfume_atomizer.jpg || true
           set +e
           OUT=$(flutter test --dart-define=SIRAGRO_CAPTURE_SCREENSHOTS=true 2>&1)
           RC=$?

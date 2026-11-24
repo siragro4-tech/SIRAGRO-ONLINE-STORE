@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -60,6 +61,131 @@ Map<String, dynamic>? _loadJsonMap(String path) {
   return decoded is Map<String, dynamic> ? decoded : null;
 }
 
+Future<void> _pumpSettledFrames(WidgetTester tester) async {
+  for (var i = 0; i < 8; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.binding.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+  });
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+class _LocalTestHttpOverrides extends HttpOverrides {
+  final List<int>? imageBytes;
+  _LocalTestHttpOverrides(this.imageBytes);
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return _MockHttpClient(imageBytes);
+  }
+}
+
+class _MockHttpClient implements HttpClient {
+  final List<int>? imageBytes;
+  _MockHttpClient(this.imageBytes);
+
+  @override
+  bool autoUncompress = true;
+
+  @override
+  Duration? connectionTimeout;
+
+  @override
+  Duration idleTimeout = const Duration(seconds: 15);
+
+  @override
+  int? maxConnectionsPerHost;
+
+  @override
+  String? userAgent;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async =>
+      _MockHttpClientRequest(url, imageBytes);
+
+  @override
+  Future<HttpClientRequest> openUrl(String method, Uri url) async =>
+      _MockHttpClientRequest(url, imageBytes);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _MockHttpClientRequest implements HttpClientRequest {
+  @override
+  final Uri uri;
+  final List<int>? imageBytes;
+  _MockHttpClientRequest(this.uri, this.imageBytes);
+
+  @override
+  final HttpHeaders headers = _MockHttpHeaders();
+
+  @override
+  Future<HttpClientResponse> close() async => _MockHttpClientResponse(imageBytes);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+class _MockHttpHeaders implements HttpHeaders {
+  @override
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {}
+
+  @override
+  void add(String name, Object value, {bool preserveHeaderCase = false}) {}
+
+  @override
+  void forEach(void Function(String name, List<String> values) action) {}
+
+  @override
+  String? value(String name) =>
+      name.toLowerCase() == 'content-type' ? 'image/jpeg' : null;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+class _MockHttpClientResponse extends Stream<List<int>>
+    implements HttpClientResponse {
+  final List<int>? imageBytes;
+  _MockHttpClientResponse(this.imageBytes);
+
+  @override
+  int get statusCode => imageBytes != null ? 200 : 404;
+
+  @override
+  int get contentLength => imageBytes?.length ?? 0;
+
+  @override
+  HttpHeaders get headers => _MockHttpHeaders();
+
+  @override
+  HttpClientResponseCompressionState get compressionState =>
+      HttpClientResponseCompressionState.notCompressed;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    final bytes = imageBytes ?? const <int>[];
+    return Stream<List<int>>.fromIterable([bytes]).listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
 Future<void> _savePngIfEnabled(
   WidgetTester tester,
   GlobalKey boundaryKey,
@@ -82,6 +208,8 @@ Future<void> _savePngIfEnabled(
 }
 
 void main() {
+  HttpOverrides? previousHttpOverrides;
+
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     const channel = MethodChannel('plugins.flutter.io/path_provider');
@@ -89,6 +217,17 @@ void main() {
         .setMockMethodCallHandler(channel, (MethodCall call) async {
       return Directory.systemTemp.path;
     });
+    final imgFile = File('build/perfume_atomizer.jpg');
+    if (imgFile.existsSync()) {
+      previousHttpOverrides = HttpOverrides.current;
+      HttpOverrides.global = _LocalTestHttpOverrides(imgFile.readAsBytesSync());
+    }
+  });
+
+  tearDownAll(() {
+    if (previousHttpOverrides != null) {
+      HttpOverrides.global = previousHttpOverrides;
+    }
   });
 
   final sampleCategories = [
@@ -206,7 +345,7 @@ void main() {
       ),
     );
 
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     await tester.binding.runAsync(() async {
       final ctx = tester.element(find.byType(HomeScreen));
       await precacheImage(
@@ -218,17 +357,17 @@ void main() {
         ctx,
       );
     });
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_top.png');
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -650));
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_mid.png');
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -1100));
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_footer.png');
   });
@@ -268,7 +407,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_product_detail.png');
   });
@@ -291,7 +430,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_account.png');
   });
@@ -397,7 +536,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpSettledFrames(tester);
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_shop.png');
   });
