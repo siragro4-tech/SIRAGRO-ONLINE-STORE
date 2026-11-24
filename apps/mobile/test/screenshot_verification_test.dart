@@ -169,6 +169,18 @@ void main() {
     );
 
     await tester.pumpAndSettle();
+    await tester.binding.runAsync(() async {
+      final ctx = tester.element(find.byType(HomeScreen));
+      await precacheImage(
+        const AssetImage('assets/images/hero-supermarket.jpg'),
+        ctx,
+      );
+      await precacheImage(
+        const AssetImage('assets/images/siragro-logo.jpg'),
+        ctx,
+      );
+    });
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_top.png');
 

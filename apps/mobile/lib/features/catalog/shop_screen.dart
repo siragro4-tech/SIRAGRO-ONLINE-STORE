@@ -404,7 +404,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                                         crossAxisCount: cols,
                                         crossAxisSpacing: 12,
                                         mainAxisSpacing: 12,
-                                        childAspectRatio: 0.50,
+                                        childAspectRatio: 0.56,
                                       ),
                                       itemCount: _items.length,
                                       itemBuilder: (context, index) {
