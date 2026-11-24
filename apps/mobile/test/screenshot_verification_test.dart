@@ -4,8 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:siragro_mobile/app/theme/siragro_theme.dart';
+import 'package:siragro_mobile/core/config/app_config.dart';
+import 'package:siragro_mobile/core/networking/api_client.dart';
+import 'package:siragro_mobile/core/providers/app_providers.dart';
+import 'package:siragro_mobile/core/storage/secure_token_storage.dart';
 import 'package:siragro_mobile/features/account/account_screen.dart';
 import 'package:siragro_mobile/features/basket/basket_controller.dart';
+import 'package:siragro_mobile/features/catalog/shop_screen.dart';
 import 'package:siragro_mobile/features/home/home_screen.dart';
 import 'package:siragro_mobile/features/product/product_detail_screen.dart';
 import 'package:siragro_mobile/shared/models/basket.dart';
@@ -20,6 +25,30 @@ class _EmptyBasketController extends BasketController {
   @override
   Future<BasketSummary> build() async =>
       const BasketSummary(items: [], itemCount: 0, subtotal: 0);
+}
+
+class _FakeProductsApiClient extends SiragroApiClient {
+  final List<Map<String, dynamic>> rawProducts;
+
+  _FakeProductsApiClient({
+    required super.config,
+    required this.rawProducts,
+  }) : super(
+          tokenStorage: const SecureTokenStorage(),
+          accessTokenProvider: () => null,
+        );
+
+  @override
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    return {
+      'items': rawProducts,
+      'hasMore': false,
+      'totalCount': rawProducts.length,
+    };
+  }
 }
 
 Future<void> _savePngIfEnabled(
@@ -203,5 +232,95 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_account.png');
+  });
+
+  testWidgets('Phone viewport (390x844) ShopScreen renders without overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    const testConfig = AppConfig(
+      environment: 'test',
+      apiBaseUrl: 'https://example.invalid',
+      supabaseUrl: '',
+      supabaseAnonKey: '',
+      appScheme: 'siragro',
+    );
+    final rawProducts = [
+      {
+        'id': 'a1',
+        'name': '[DEV ONLY] Crisp Red Gala Apples',
+        'slug': 'dev-gala-apples-6pk',
+        'description': 'Sweet and crunchy British red gala apples.',
+        'price': 1.85,
+        'compareAtPrice': 2.10,
+        'unit': 'Pack of 6',
+        'brand': 'Farm Fresh',
+        'stockQuantity': 45,
+        'isAvailable': true,
+        'isAgeRestricted': false,
+        'category': {
+          'id': 'c1',
+          'name': 'Fresh Produce',
+          'slug': 'fresh-produce',
+        },
+        'primaryImageUrl': null,
+        'images': <dynamic>[],
+      },
+      {
+        'id': 'a2',
+        'name': '[DEV ONLY] British Semi-Skimmed Milk 2L',
+        'slug': 'dev-semi-skimmed-milk-2l',
+        'description': 'Fresh pasteurised semi-skimmed cow milk.',
+        'price': 1.65,
+        'unit': '2 Litres',
+        'brand': 'Country Pure',
+        'stockQuantity': 50,
+        'isAvailable': true,
+        'isAgeRestricted': false,
+        'category': {
+          'id': 'c2',
+          'name': 'Dairy & Eggs',
+          'slug': 'dairy-eggs',
+        },
+        'primaryImageUrl': null,
+        'images': <dynamic>[],
+      },
+    ];
+    final homeData = HomeData(
+      categories: sampleCategories,
+      featuredProducts: sampleProducts,
+      fulfilment: const FulfilmentAvailability(
+        settingsLoaded: true,
+        deliveryAvailable: false,
+        collectionAvailable: true,
+        pricingConfirmed: false,
+      ),
+    );
+
+    final boundaryKey = GlobalKey();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appConfigProvider.overrideWithValue(testConfig),
+          apiClientProvider.overrideWithValue(
+            _FakeProductsApiClient(config: testConfig, rawProducts: rawProducts),
+          ),
+          homeDataProvider.overrideWith((ref) async => homeData),
+          basketControllerProvider.overrideWith(() => _EmptyBasketController()),
+        ],
+        child: RepaintBoundary(
+          key: boundaryKey,
+          child: MaterialApp(
+            theme: SiragroTheme.light(),
+            home: const ShopScreen(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await _savePngIfEnabled(tester, boundaryKey, 'flutter_shop.png');
   });
 }

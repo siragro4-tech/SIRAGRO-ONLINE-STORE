@@ -111,8 +111,25 @@ jobs:
           if command -v google-chrome >/dev/null 2>&1; then
             google-chrome --headless --disable-gpu --window-size=390,844 --screenshot=apps/mobile/build/screenshots/website_home.png "https://siragro-online-store-2h6u4bp1i-siragro.vercel.app/" || true
             google-chrome --headless --disable-gpu --window-size=390,844 --screenshot=apps/mobile/build/screenshots/website_shop.png "https://siragro-online-store-2h6u4bp1i-siragro.vercel.app/shop" || true
+            google-chrome --headless --disable-gpu --window-size=390,844 --screenshot=apps/mobile/build/screenshots/website_product_detail.png "https://siragro-online-store-2h6u4bp1i-siragro.vercel.app/product/perfume-atomizer" || true
           fi
           ls -la apps/mobile/build/screenshots
+
+      - name: Verify Staging Supabase Auth key configuration
+        env:
+          SIRAGRO_SUPABASE_URL: ${{ secrets.SIRAGRO_STAGING_SUPABASE_URL }}
+          SIRAGRO_SUPABASE_ANON_KEY: ${{ secrets.SIRAGRO_STAGING_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "${SIRAGRO_SUPABASE_URL}" ] || [ -z "${SIRAGRO_SUPABASE_ANON_KEY}" ]; then
+            echo "::error::Missing SIRAGRO_STAGING_SUPABASE_URL or SIRAGRO_STAGING_SUPABASE_ANON_KEY."
+            exit 1
+          fi
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" -H "apikey: ${SIRAGRO_SUPABASE_ANON_KEY}" "${SIRAGRO_SUPABASE_URL}/auth/v1/settings")
+          echo "Staging Supabase Auth /auth/v1/settings HTTP status: ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::Staging Supabase Auth key check failed with HTTP ${HTTP_CODE}."
+            exit 1
+          fi
 
       - name: Build Staging Debug APK
         working-directory: apps/mobile
