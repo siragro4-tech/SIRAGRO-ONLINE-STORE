@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -49,6 +50,13 @@ class _FakeProductsApiClient extends SiragroApiClient {
       'totalCount': rawProducts.length,
     };
   }
+}
+
+Map<String, dynamic>? _loadJsonMap(String path) {
+  final file = File(path);
+  if (!file.existsSync()) return null;
+  final decoded = jsonDecode(file.readAsStringSync());
+  return decoded is Map<String, dynamic> ? decoded : null;
 }
 
 Future<void> _savePngIfEnabled(
@@ -140,16 +148,36 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
+    final stagingHome = _loadJsonMap('build/staging_home.json');
+    final homeCategories = stagingHome != null
+        ? (stagingHome['categories'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(StoreCategory.fromJson)
+            .toList()
+        : sampleCategories;
+    final homeProducts = stagingHome != null
+        ? (stagingHome['featuredProducts'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(Product.fromJson)
+            .toList()
+        : sampleProducts;
+    final homeFulfilment = stagingHome != null &&
+            stagingHome['fulfilment'] is Map<String, dynamic>
+        ? FulfilmentAvailability.fromJson(
+            stagingHome['fulfilment'] as Map<String, dynamic>,
+          )
+        : const FulfilmentAvailability(
+            settingsLoaded: true,
+            deliveryAvailable: false,
+            collectionAvailable: true,
+            pricingConfirmed: false,
+          );
+
     final boundaryKey = GlobalKey();
     final homeData = HomeData(
-      categories: sampleCategories,
-      featuredProducts: sampleProducts,
-      fulfilment: const FulfilmentAvailability(
-        settingsLoaded: true,
-        deliveryAvailable: false,
-        collectionAvailable: true,
-        pricingConfirmed: false,
-      ),
+      categories: homeCategories,
+      featuredProducts: homeProducts,
+      fulfilment: homeFulfilment,
     );
 
     await tester.pumpWidget(
@@ -201,19 +229,31 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
+    final stagingProductsJson = _loadJsonMap('build/staging_products.json');
+    final stagingItems = stagingProductsJson != null
+        ? (stagingProductsJson['items'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(Product.fromJson)
+            .toList()
+        : sampleProducts;
+    final detailProduct = stagingItems.firstWhere(
+      (p) => p.slug == 'perfume-atomizer',
+      orElse: () => stagingItems.first,
+    );
+
     final boundaryKey = GlobalKey();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          productDetailProvider('dev-gala-apples-6pk')
-              .overrideWith((ref) async => sampleProducts.first),
+          productDetailProvider(detailProduct.slug)
+              .overrideWith((ref) async => detailProduct),
           basketControllerProvider.overrideWith(() => _EmptyBasketController()),
         ],
         child: RepaintBoundary(
           key: boundaryKey,
           child: MaterialApp(
             theme: SiragroTheme.light(),
-            home: const ProductDetailScreen(slug: 'dev-gala-apples-6pk'),
+            home: ProductDetailScreen(slug: detailProduct.slug),
           ),
         ),
       ),
@@ -296,12 +336,25 @@ void main() {
           'name': 'Dairy & Eggs',
           'slug': 'dairy-eggs',
         },
-        'primaryImageUrl': null,
-        'images': <dynamic>[],
-      },
-    ];
+      'primaryImageUrl': null,
+      'images': <dynamic>[],
+    },
+  ];
+    final stagingHomeJson = _loadJsonMap('build/staging_home.json');
+    final stagingProductsJson = _loadJsonMap('build/staging_products.json');
+    final shopCategories = stagingHomeJson != null
+        ? (stagingHomeJson['categories'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(StoreCategory.fromJson)
+            .toList()
+        : sampleCategories;
+    final shopRawProducts = stagingProductsJson != null
+        ? (stagingProductsJson['items'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList()
+        : rawProducts;
     final homeData = HomeData(
-      categories: sampleCategories,
+      categories: shopCategories,
       featuredProducts: sampleProducts,
       fulfilment: const FulfilmentAvailability(
         settingsLoaded: true,
@@ -317,7 +370,10 @@ void main() {
         overrides: [
           appConfigProvider.overrideWithValue(testConfig),
           apiClientProvider.overrideWithValue(
-            _FakeProductsApiClient(config: testConfig, rawProducts: rawProducts),
+            _FakeProductsApiClient(
+              config: testConfig,
+              rawProducts: shopRawProducts,
+            ),
           ),
           homeDataProvider.overrideWith((ref) async => homeData),
           basketControllerProvider.overrideWith(() => _EmptyBasketController()),

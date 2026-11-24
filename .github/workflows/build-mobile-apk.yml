@@ -93,7 +93,14 @@ jobs:
 
       - name: Run Flutter unit, widget & phone-viewport screenshot tests
         working-directory: apps/mobile
+        env:
+          SIRAGRO_API_BASE_URL: ${{ secrets.SIRAGRO_STAGING_API_URL }}
         run: |
+          mkdir -p build
+          if [ -n "${SIRAGRO_API_BASE_URL}" ]; then
+            curl -fsS "${SIRAGRO_API_BASE_URL}/api/v1/home" -o build/staging_home.json || true
+            curl -fsS "${SIRAGRO_API_BASE_URL}/api/v1/products?page=1&limit=24" -o build/staging_products.json || true
+          fi
           set +e
           OUT=$(flutter test --dart-define=SIRAGRO_CAPTURE_SCREENSHOTS=true 2>&1)
           RC=$?
