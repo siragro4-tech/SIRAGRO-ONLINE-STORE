@@ -105,8 +105,7 @@ void main() {
     }),
   ];
 
-  testWidgets(
-      'Phone viewport (390x844) Home, ProductDetail, and Account render without overflow',
+  testWidgets('Phone viewport (390x844) HomeScreen renders all sections without overflow',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
@@ -153,7 +152,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_home_footer.png');
+  });
 
+  testWidgets('Phone viewport (390x844) ProductDetailScreen renders without overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final boundaryKey = GlobalKey();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -173,7 +180,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await _savePngIfEnabled(tester, boundaryKey, 'flutter_product_detail.png');
+  });
 
+  testWidgets('Phone viewport (390x844) AccountScreen renders without overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final boundaryKey = GlobalKey();
     await tester.pumpWidget(
       ProviderScope(
         child: RepaintBoundary(
