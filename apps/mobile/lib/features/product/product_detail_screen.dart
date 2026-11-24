@@ -168,30 +168,38 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               ],
               const SizedBox(height: 14),
 
-              Row(
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 10,
+                runSpacing: 8,
                 children: [
-                  Text(
-                    '£${product.price.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: SiragroColors.brand,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  if (product.hasDiscount) ...[
-                    const SizedBox(width: 10),
-                    Text(
-                      '£${product.compareAtPrice!.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: SiragroColors.textMuted,
-                        decoration: TextDecoration.lineThrough,
-                        fontFeatures: [FontFeature.tabularFigures()],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '£${product.price.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: SiragroColors.brand,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
                       ),
-                    ),
-                  ],
-                  const Spacer(),
+                      if (product.hasDiscount) ...[
+                        const SizedBox(width: 10),
+                        Text(
+                          '£${product.compareAtPrice!.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: SiragroColors.textMuted,
+                            decoration: TextDecoration.lineThrough,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   Chip(
                     label: Text(
                       product.isOutOfStock
@@ -285,7 +293,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                             icon: const Icon(Icons.remove_rounded),
                           ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
                             child: Text(
                               '$_quantity',
                               style: const TextStyle(
@@ -332,10 +340,13 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                                 );
                               },
                         icon: const Icon(Icons.shopping_basket_outlined),
-                        label: Text(
-                          _isAdding
-                              ? 'Adding…'
-                              : 'Add • £${(product.price * _quantity).toStringAsFixed(2)}',
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _isAdding
+                                ? 'Adding…'
+                                : 'Add • £${(product.price * _quantity).toStringAsFixed(2)}',
+                          ),
                         ),
                       ),
                     ),
